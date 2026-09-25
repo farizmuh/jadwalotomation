@@ -1,0 +1,113 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model SchoolSetting {
+  id                 Int      @id @default(autoincrement())
+  schoolName         String   @default("SMKS ISLAM DONOMULYO")
+  semester           String   @default("SEMESTER GANJIL")
+  academicYear       String   @default("TAHUN AJARAN 2026-2027")
+  headmasterName     String   @default("IMAM SAFI'I, S.Pd., M.Si")
+  curriculumHeadName String   @default("WAHYU DIAN PERMANA, S.Pd")
+  dateLocation       String   @default("Donomulyo, 13 Juni 2026")
+  updatedAt          DateTime @updatedAt
+}
+
+model Teacher {
+  id              Int            @id // Kode Guru: 1, 2, 3.. 29
+  name            String         // Nama Lengkap & Gelar
+  nickname        String?
+  phone           String?
+  maxHoursPerWeek Int            @default(30)
+  isActive        Boolean        @default(true)
+  subjects        Subject[]
+  schedules       ScheduleItem[]
+  piket1          TeacherPiket[] @relation("PiketGuru1")
+  piket2          TeacherPiket[] @relation("PiketGuru2")
+}
+
+model Subject {
+  id          Int            @id @default(autoincrement())
+  teacherId   Int
+  teacher     Teacher        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  code        String         // Kode huruf: "a", "b", "c", etc.
+  name        String         // Nama Mapel (misal "Matematika", "Produktif TKJ")
+  targetJp    Int            @default(4) // Alokasi JP per minggu (Jam Pelajaran)
+  classroomId Int?
+  classroom   Classroom?     @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+  schedules   ScheduleItem[]
+
+  @@unique([teacherId, code])
+}
+
+model Classroom {
+  id         Int            @id @default(autoincrement())
+  grade      String         // "X", "XI", "XII"
+  major      String         // "BDP", "TKJ", "MP", "T1", "T2"
+  name       String         // "X BDP", "XI TKJ", "XII T1"
+  orderIndex Int            @default(0)
+  subjects   Subject[]
+  schedules  ScheduleItem[]
+}
+
+model Day {
+  id         Int           @id @default(autoincrement())
+  name       String        // "SENIN", "SELASA", "RABU", "KAMIS", "JUM'AT"
+  orderIndex Int
+  timeSlots  TimeSlot[]
+  piket      TeacherPiket?
+}
+
+model TimeSlot {
+  id          Int            @id @default(autoincrement())
+  dayId       Int
+  day         Day            @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  period      Int?           // Jam ke (1..9), null jika istirahat/event
+  timeStart   String         // "07.00"
+  timeEnd     String         // "07.45"
+  timeDisplay String         // "07.00 - 07.45"
+  slotType    String         @default("LESSON") // "LESSON", "CEREMONY", "BREAK", "FRIDAY_PRAYER"
+  label       String?        // "ISTIRAHAT", "UPACARA...", etc.
+  orderIndex  Int
+  schedules   ScheduleItem[]
+}
+
+model ScheduleItem {
+  id          Int        @id @default(autoincrement())
+  timeSlotId  Int
+  timeSlot    TimeSlot   @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+  classroomId Int
+  classroom   Classroom  @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  teacherId   Int?
+  teacher     Teacher?   @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  subjectId   Int?
+  subject     Subject?   @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  subjectCode String?    // huruf sub-kode mapel seperti "a", "b", "c", dsb.
+  customLabel String?    // Jika slot khusus (misal "UPACARA...")
+  
+  @@unique([timeSlotId, classroomId])
+}
+
+model TeacherPiket {
+  id           Int      @id @default(autoincrement())
+  dayId        Int      @unique
+  day          Day      @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  teacher1Id   Int?
+  teacher1     Teacher? @relation("PiketGuru1", fields: [teacher1Id], references: [id], onDelete: SetNull)
+  teacher1Name String?
+  teacher2Id   Int?
+  teacher2     Teacher? @relation("PiketGuru2", fields: [teacher2Id], references: [id], onDelete: SetNull)
+  teacher2Name String?
+}
+
+model Extracurricular {
+  id         Int    @id @default(autoincrement())
+  name       String // "BTQ", "ECC", "BDI", etc.
+  leader     String // "Ikhlas Bahtiyar, S.Sos"
+  orderIndex Int    @default(0)
+}
