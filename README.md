@@ -11,7 +11,7 @@ Website aplikasi penyusunan jadwal pelajaran otomatis (auto-scheduler) dan edito
    - Panel Guru Piket harian di bawah setiap hari.
    - Panel Pembina Ekstrakurikuler di sisi kanan.
    - Tabel Kode Guru (1 s/d 29) lengkap dengan gelar akademik.
-   - Lembar tanda tangan resmi Kepala Sekolah (dengan stempel cap) dan Wakakur.
+   - Lembar tanda tangan resmi Kepala Sekolah dan Wakakur (ruang tanda tangan & stempel manual).
 2. **Mesin Anti-Tabrakan (Anti-Collision Engine)**:
    - Memastikan tidak ada guru yang mengajar di lebih dari satu kelas pada hari dan jam yang sama.
    - Peringatan instan real-time jika terjadi bentrok saat admin mengedit jadwal.

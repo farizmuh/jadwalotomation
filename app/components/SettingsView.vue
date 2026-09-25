@@ -310,6 +310,319 @@ function getTeacherTotalTargetJp(teacher: any) {
   return teacher.subjects.reduce((acc: number, s: any) => acc + (s.targetJp || 0), 0)
 }
 
+// --- BULK CREATE TEACHERS & SUBJECTS ---
+const showBulkTeacherModal = ref(false)
+const bulkTeacherTab = ref<'paste' | 'table'>('paste')
+const bulkTeacherText = ref('')
+const isBulkSaving = ref(false)
+const bulkError = ref('')
+
+const bulkTeacherRows = ref<Array<{
+  id: string
+  name: string
+  subjectStr: string
+  targetJp: number
+}>>([
+  { id: '', name: '', subjectStr: '', targetJp: 4 },
+  { id: '', name: '', subjectStr: '', targetJp: 4 },
+  { id: '', name: '', subjectStr: '', targetJp: 4 }
+])
+
+function openBulkTeacherModal() {
+  showBulkTeacherModal.value = true
+  bulkError.value = ''
+}
+
+function addBulkRow(count = 1) {
+  for (let i = 0; i < count; i++) {
+    bulkTeacherRows.value.push({ id: '', name: '', subjectStr: '', targetJp: 4 })
+  }
+}
+
+function removeBulkRow(index: number) {
+  bulkTeacherRows.value.splice(index, 1)
+  if (bulkTeacherRows.value.length === 0) {
+    addBulkRow(1)
+  }
+}
+
+function resetBulkRows() {
+  bulkTeacherRows.value = [
+    { id: '', name: '', subjectStr: '', targetJp: 4 },
+    { id: '', name: '', subjectStr: '', targetJp: 4 },
+    { id: '', name: '', subjectStr: '', targetJp: 4 }
+  ]
+}
+
+function loadSampleBulkData() {
+  bulkTeacherText.value = `30\tDrs. H. Mulyadi, M.Pd\tMatematika\t4
+31\tDewi Sartika, S.Pd\tBahasa Inggris\t4
+32\tRizal Firmansyah, S.Kom\tPemrograman Web, Basis Data\t4
+33\tDra. Hj. Nurul Hidayah\t(Non-Pengajar)`
+}
+
+// Parse text into structured list
+const parsedBulkFromText = computed(() => {
+  if (!bulkTeacherText.value.trim()) return []
+  const lines = bulkTeacherText.value.split('\n')
+  const results: any[] = []
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line) continue
+
+    // Detect delimiter: tab, pipe, semicolon, or comma
+    let delimiter = '\t'
+    if (line.includes('\t')) delimiter = '\t'
+    else if (line.includes('|')) delimiter = '|'
+    else if (line.includes(';')) delimiter = ';'
+    else if (line.includes(',')) delimiter = ','
+
+    const parts = line.split(delimiter).map((p) => p.trim()).filter(Boolean)
+    if (parts.length === 0) continue
+
+    let id: string | null = null
+    let name = ''
+    let subjectStr = ''
+    let targetJp = 4
+
+    // Check if first column is numeric ID
+    if (/^\d+$/.test(parts[0])) {
+      id = parts[0]
+      name = parts[1] || ''
+      subjectStr = parts[2] || ''
+      if (parts[3] && !isNaN(Number(parts[3]))) {
+        targetJp = Number(parts[3])
+      }
+    } else {
+      name = parts[0] || ''
+      subjectStr = parts[1] || ''
+      if (parts[2] && !isNaN(Number(parts[2]))) {
+        targetJp = Number(parts[2])
+      }
+    }
+
+    if (name) {
+      results.push({
+        id,
+        name,
+        subjectStr,
+        targetJp: targetJp > 0 ? targetJp : 4
+      })
+    }
+  }
+  return results
+})
+
+// Combined active bulk list based on active tab
+const activeBulkTeacherList = computed(() => {
+  if (bulkTeacherTab.value === 'paste') {
+    return parsedBulkFromText.value
+  } else {
+    return bulkTeacherRows.value
+      .filter((r) => r.name.trim())
+      .map((r) => ({
+        id: r.id.trim() || null,
+        name: r.name.trim(),
+        subjectStr: r.subjectStr.trim(),
+        targetJp: Number(r.targetJp) || 4
+      }))
+  }
+})
+
+// Helper to parse subject string like "Matematika, Fisika" or "(Non-Pengajar)"
+function parseSubjectsFromStr(str: string, defaultJp: number) {
+  if (!str) return []
+  const clean = str.trim()
+  if (
+    clean.toLowerCase() === '(non-pengajar)' ||
+    clean.toLowerCase() === 'non-pengajar' ||
+    clean === '-' ||
+    clean.toLowerCase() === 'non pengajar'
+  ) {
+    return []
+  }
+
+  // Split by comma or semicolon
+  const subs = clean.split(/[,;]+/).map((s) => s.trim()).filter(Boolean)
+  return subs.map((s) => {
+    // Check if has JP annotation like "Matematika (4)" or "Matematika: 4"
+    const jpMatch = s.match(/\((\d+)\s*(?:jp)?\)/i) || s.match(/:\s*(\d+)/)
+    if (jpMatch) {
+      const parsedJp = Number(jpMatch[1])
+      const cleanName = s.replace(jpMatch[0], '').trim()
+      return { name: cleanName, targetJp: parsedJp || defaultJp }
+    }
+    return { name: s, targetJp: defaultJp }
+  })
+}
+
+// Compute preview with validation
+const bulkTeachersPreview = computed(() => {
+  const existingTeachers = props.teachers || []
+  const existingIdSet = new Set(existingTeachers.map((t) => t.id))
+  let maxId = existingTeachers.reduce((max, t) => Math.max(max, t.id), 0)
+
+  const usedIdsInBatch = new Set<number>()
+
+  return activeBulkTeacherList.value.map((item, idx) => {
+    let resolvedId: number
+    let isAutoId = false
+    let hasConflict = false
+    let conflictMsg = ''
+
+    if (item.id) {
+      resolvedId = Number(item.id)
+      if (existingIdSet.has(resolvedId)) {
+        hasConflict = true
+        conflictMsg = `Kode ${resolvedId} sudah terpakai`
+      } else if (usedIdsInBatch.has(resolvedId)) {
+        hasConflict = true
+        conflictMsg = `Kode ${resolvedId} duplikat di daftar massal`
+      }
+    } else {
+      isAutoId = true
+      do {
+        maxId++
+      } while (existingIdSet.has(maxId) || usedIdsInBatch.has(maxId))
+      resolvedId = maxId
+    }
+
+    if (!hasConflict) {
+      usedIdsInBatch.add(resolvedId)
+    }
+
+    const parsedSubjects = parseSubjectsFromStr(item.subjectStr, item.targetJp)
+
+    return {
+      index: idx + 1,
+      id: resolvedId,
+      isAutoId,
+      name: item.name,
+      subjects: parsedSubjects,
+      hasConflict,
+      conflictMsg
+    }
+  })
+})
+
+const canSaveBulkTeachers = computed(() => {
+  if (bulkTeachersPreview.value.length === 0) return false
+  return !bulkTeachersPreview.value.some((p) => p.hasConflict)
+})
+
+async function saveBulkTeachers() {
+  if (!canSaveBulkTeachers.value) return
+  isBulkSaving.value = true
+  bulkError.value = ''
+
+  try {
+    const payload = bulkTeachersPreview.value.map((item) => ({
+      id: item.id,
+      name: item.name,
+      subjects: item.subjects
+    }))
+
+    const res: any = await $fetch('/api/teachers/bulk', {
+      method: 'POST',
+      body: { teachers: payload }
+    })
+
+    if (res.success) {
+      showNotification('success', res.message || `Berhasil menambahkan ${payload.length} guru massal!`)
+      showBulkTeacherModal.value = false
+      bulkTeacherText.value = ''
+      resetBulkRows()
+      emit('refreshed')
+    } else {
+      bulkError.value = res.error || 'Gagal menyimpan guru massal'
+    }
+  } catch (err: any) {
+    bulkError.value = err.data?.message || err.message || 'Terjadi kesalahan saat menyimpan'
+  } finally {
+    isBulkSaving.value = false
+  }
+}
+
+// --- BULK CREATE SUBJECTS FOR SINGLE TEACHER ---
+const subjectAddTab = ref<'single' | 'bulk'>('single')
+const bulkSubjectText = ref('')
+const isBulkSubjectSaving = ref(false)
+const bulkSubjectError = ref('')
+
+function loadSampleBulkSubjects() {
+  bulkSubjectText.value = `Pemrograman Web Lanjut\t4
+Basis Data Relasional\t4
+Dasar Desain Grafis\t2`
+}
+
+const parsedBulkSubjects = computed(() => {
+  if (!bulkSubjectText.value.trim()) return []
+  const lines = bulkSubjectText.value.split('\n')
+  const results: any[] = []
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line) continue
+
+    let delimiter = '\t'
+    if (line.includes('\t')) delimiter = '\t'
+    else if (line.includes('|')) delimiter = '|'
+    else if (line.includes(';')) delimiter = ';'
+    else if (line.includes(',')) delimiter = ','
+
+    const parts = line.split(delimiter).map((p) => p.trim()).filter(Boolean)
+    if (parts.length === 0) continue
+
+    let name = ''
+    let targetJp = 4
+
+    if (parts.length >= 2) {
+      const num = Number(parts[1])
+      if (!isNaN(num) && num > 0) {
+        name = parts[0]
+        targetJp = num
+      } else {
+        name = parts.join(' - ')
+      }
+    } else {
+      name = parts[0]
+    }
+
+    if (name) {
+      results.push({ name, targetJp })
+    }
+  }
+  return results
+})
+
+async function saveBulkSubjects() {
+  if (!currentManagingTeacher.value || parsedBulkSubjects.value.length === 0) return
+  isBulkSubjectSaving.value = true
+  bulkSubjectError.value = ''
+
+  try {
+    const res: any = await $fetch(`/api/teachers/${currentManagingTeacher.value.id}/subjects-bulk`, {
+      method: 'POST',
+      body: { subjects: parsedBulkSubjects.value }
+    })
+
+    if (res.success) {
+      showNotification('success', res.message || 'Berhasil menambahkan mata pelajaran massal!')
+      bulkSubjectText.value = ''
+      subjectAddTab.value = 'single'
+      emit('refreshed')
+    } else {
+      bulkSubjectError.value = res.error || 'Gagal menambahkan mata pelajaran'
+    }
+  } catch (err: any) {
+    bulkSubjectError.value = err.data?.message || err.message || 'Terjadi kesalahan'
+  } finally {
+    isBulkSubjectSaving.value = false
+  }
+}
+
+
 // 3. Classrooms Form
 const newClassroom = reactive({
   grade: 'X',
@@ -675,6 +988,16 @@ async function saveEditSlot() {
             Total: {{ teachers.length }} Guru terdaftar di sistem.
           </p>
         </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            @click="openBulkTeacherModal"
+            class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <span class="text-sm">⚡</span>
+            <span>Tambah Guru Massal (Bulk Create)</span>
+          </button>
+        </div>
       </div>
 
       <!-- Add Teacher Form -->
@@ -1038,12 +1361,42 @@ async function saveEditSlot() {
 
             <!-- Form Add Subject -->
             <div class="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-3">
-              <h5 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                <span>➕</span>
-                <span>Tambah Mata Pelajaran Baru</span>
-              </h5>
+              <div class="flex items-center justify-between">
+                <h5 class="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <span>➕</span>
+                  <span>Tambah Mata Pelajaran</span>
+                </h5>
+                <div class="flex items-center gap-1 bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
+                  <button
+                    type="button"
+                    :class="[
+                      'px-2.5 py-1 rounded-md transition',
+                      subjectAddTab === 'single'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    ]"
+                    @click="subjectAddTab = 'single'"
+                  >
+                    Input Satuan
+                  </button>
+                  <button
+                    type="button"
+                    :class="[
+                      'px-2.5 py-1 rounded-md transition flex items-center gap-1',
+                      subjectAddTab === 'bulk'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    ]"
+                    @click="subjectAddTab = 'bulk'"
+                  >
+                    <span>⚡</span>
+                    <span>Massal (Banyak Sekaligus)</span>
+                  </button>
+                </div>
+              </div>
 
-              <form @submit.prevent="addSubject" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+              <!-- Single Form -->
+              <form v-if="subjectAddTab === 'single'" @submit.prevent="addSubject" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
                 <div class="sm:col-span-2">
                   <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
                     Sub-Kode *
@@ -1095,6 +1448,61 @@ async function saveEditSlot() {
                   </button>
                 </div>
               </form>
+
+              <!-- Bulk Form -->
+              <div v-else class="space-y-3 pt-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-slate-500 dark:text-slate-400 text-[11px]">
+                    Ketik atau Paste daftar mapel dan JP (1 baris per mapel). Format: <b>Nama Mapel [Tab/Koma] JP</b>
+                  </span>
+                  <button
+                    type="button"
+                    @click="loadSampleBulkSubjects"
+                    class="text-emerald-600 hover:text-emerald-700 font-bold text-[11px] underline cursor-pointer"
+                  >
+                    📋 Muat Contoh
+                  </button>
+                </div>
+
+                <textarea
+                  v-model="bulkSubjectText"
+                  rows="3"
+                  placeholder="Contoh:&#10;Pemrograman Web Lanjut	4&#10;Basis Data Relasional	4&#10;Dasar Desain Grafis	2"
+                  class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono"
+                ></textarea>
+
+                <div v-if="parsedBulkSubjects.length > 0" class="p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl space-y-1.5">
+                  <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                    <span>Preview ({{ parsedBulkSubjects.length }} Mapel Baru):</span>
+                  </div>
+                  <div class="flex flex-wrap gap-1.5">
+                    <span
+                      v-for="(sub, sIdx) in parsedBulkSubjects"
+                      :key="sIdx"
+                      class="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                    >
+                      <span>{{ sub.name }}</span>
+                      <span class="font-mono font-bold bg-emerald-200/60 dark:bg-emerald-800/60 px-1 rounded text-[11px]">{{ sub.targetJp }} JP</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div v-if="bulkSubjectError" class="p-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs rounded-lg font-semibold">
+                  {{ bulkSubjectError }}
+                </div>
+
+                <div class="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    :disabled="isBulkSubjectSaving || parsedBulkSubjects.length === 0"
+                    @click="saveBulkSubjects"
+                    class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span v-if="isBulkSubjectSaving" class="animate-spin">⏳</span>
+                    <span>Simpan {{ parsedBulkSubjects.length }} Mata Pelajaran Sekaligus</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- Subject List Table -->
@@ -1720,6 +2128,338 @@ async function saveEditSlot() {
           >
             Simpan Seluruh Guru Piket
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: BULK CREATE GURU & MAPEL -->
+    <div
+      v-if="showBulkTeacherModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto"
+    >
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
+        <!-- Modal Header -->
+        <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center text-lg shadow-sm">
+              ⚡
+            </div>
+            <div>
+              <h3 class="font-extrabold text-base text-slate-900 dark:text-white">
+                Tambah Guru & Mata Pelajaran Massal (Bulk Create)
+              </h3>
+              <p class="text-xs text-slate-500 mt-0.5">
+                Tambahkan banyak guru sekaligus via copy-paste Excel/Spreadsheet atau tabel dinamis.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            @click="showBulkTeacherModal = false"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- Mode Selector Tabs -->
+        <div class="px-6 pt-4 pb-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center gap-2 text-xs font-bold">
+          <button
+            type="button"
+            :class="[
+              'px-3.5 py-2 rounded-xl transition flex items-center gap-2 cursor-pointer',
+              bulkTeacherTab === 'paste'
+                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
+            ]"
+            @click="bulkTeacherTab = 'paste'"
+          >
+            <span>📋</span>
+            <span>Copy-Paste Teks (Excel / Spreadsheet)</span>
+          </button>
+          <button
+            type="button"
+            :class="[
+              'px-3.5 py-2 rounded-xl transition flex items-center gap-2 cursor-pointer',
+              bulkTeacherTab === 'table'
+                ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
+            ]"
+            @click="bulkTeacherTab = 'table'"
+          >
+            <span>📝</span>
+            <span>Tabel Baris Dinamis (+ Baris)</span>
+          </button>
+        </div>
+
+        <!-- Modal Scrollable Body -->
+        <div class="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+          <!-- TAB 1: PASTE FROM EXCEL -->
+          <div v-if="bulkTeacherTab === 'paste'" class="space-y-3">
+            <div class="p-3.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span class="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <span>💡</span>
+                  <span>Format Kolom yang Didukung (Copy langsung kolom di Excel):</span>
+                </span>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    @click="loadSampleBulkData"
+                    class="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 rounded-lg font-bold text-[11px] transition cursor-pointer"
+                  >
+                    📋 Muat Contoh Data
+                  </button>
+                  <button
+                    v-if="bulkTeacherText"
+                    type="button"
+                    @click="bulkTeacherText = ''"
+                    class="px-2 py-1 text-slate-400 hover:text-rose-600 font-semibold text-[11px] transition cursor-pointer"
+                  >
+                    ✕ Bersihkan
+                  </button>
+                </div>
+              </div>
+              <div class="text-[11px] text-slate-500 font-mono bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700/60 space-y-1">
+                <div>• Format 4 Kolom: <span class="text-emerald-600 font-bold">[Kode] [Tab] [Nama Guru] [Tab] [Mata Pelajaran] [Tab] [JP]</span></div>
+                <div>• Format 3 Kolom: <span class="text-emerald-600 font-bold">[Nama Guru] [Tab] [Mata Pelajaran] [Tab] [JP]</span> (Kode diisi otomatis)</div>
+                <div>• Non-Pengajar: Tulis <span class="text-indigo-600 font-bold">(Non-Pengajar)</span> di kolom mapel (mis: Kepala Sekolah / TU).</div>
+                <div>• Banyak Mapel: Pisahkan dengan koma di kolom mapel (mis: <span class="text-teal-600 font-bold">Matematika, Fisika Terapan</span>).</div>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                Area Paste Data Teks:
+              </label>
+              <textarea
+                v-model="bulkTeacherText"
+                rows="6"
+                placeholder="Paste kolom dari spreadsheet / excel di sini...&#10;Contoh:&#10;30	Drs. H. Mulyadi, M.Pd	Matematika	4&#10;31	Dewi Sartika, S.Pd	Bahasa Inggris	4&#10;32	Rizal Firmansyah, S.Kom	Pemrograman Web, Basis Data	4&#10;33	Dra. Hj. Nurul Hidayah	(Non-Pengajar)"
+                class="w-full px-3.5 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-mono leading-relaxed focus:ring-2 focus:ring-emerald-500 outline-none"
+              ></textarea>
+            </div>
+          </div>
+
+          <!-- TAB 2: MULTI-ROW FORM -->
+          <div v-if="bulkTeacherTab === 'table'" class="space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 text-xs">
+                Isi form baris di bawah ini. Kode guru boleh dikosongkan jika ingin nomor otomatis.
+              </span>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="addBulkRow(1)"
+                  class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-bold text-xs transition cursor-pointer"
+                >
+                  + 1 Baris
+                </button>
+                <button
+                  type="button"
+                  @click="addBulkRow(5)"
+                  class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-bold text-xs transition cursor-pointer"
+                >
+                  + 5 Baris
+                </button>
+                <button
+                  type="button"
+                  @click="resetBulkRows"
+                  class="px-2 py-1 text-slate-400 hover:text-rose-600 font-semibold text-xs transition cursor-pointer"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            <div class="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold uppercase text-[10px] sticky top-0 z-10">
+                  <tr>
+                    <th class="px-2 py-2 text-center w-8">#</th>
+                    <th class="px-2 py-2 w-24">Kode Guru</th>
+                    <th class="px-3 py-2">Nama Lengkap & Gelar *</th>
+                    <th class="px-3 py-2">Mata Pelajaran (Pisah koma jika > 1)</th>
+                    <th class="px-2 py-2 text-center w-16">JP</th>
+                    <th class="px-2 py-2 text-center w-10"></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                  <tr v-for="(row, rIdx) in bulkTeacherRows" :key="rIdx">
+                    <td class="px-2 py-1.5 text-center text-slate-400 font-mono text-[11px]">
+                      {{ rIdx + 1 }}
+                    </td>
+                    <td class="px-2 py-1.5">
+                      <input
+                        v-model="row.id"
+                        type="number"
+                        placeholder="Otomatis"
+                        class="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-bold"
+                      />
+                    </td>
+                    <td class="px-2 py-1.5">
+                      <input
+                        v-model="row.name"
+                        type="text"
+                        placeholder="Contoh: Drs. H. Mulyadi, M.Pd"
+                        class="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold"
+                      />
+                    </td>
+                    <td class="px-2 py-1.5">
+                      <input
+                        v-model="row.subjectStr"
+                        type="text"
+                        placeholder="mis: Matematika atau Web, Basis Data (kosongkan jika non-pengajar)"
+                        class="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs"
+                      />
+                    </td>
+                    <td class="px-2 py-1.5">
+                      <input
+                        v-model="row.targetJp"
+                        type="number"
+                        min="1"
+                        max="40"
+                        class="w-full px-1 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-center"
+                      />
+                    </td>
+                    <td class="px-2 py-1.5 text-center">
+                      <button
+                        type="button"
+                        @click="removeBulkRow(rIdx)"
+                        class="text-slate-400 hover:text-rose-600 p-1 font-bold rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- LIVE PREVIEW & VALIDATION SECTION -->
+          <div class="border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 bg-slate-50/80 dark:bg-slate-800/40 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="font-extrabold text-xs text-slate-800 dark:text-white uppercase tracking-wider">
+                  Hasil Deteksi / Pratinjau
+                </span>
+                <span
+                  v-if="bulkTeachersPreview.length > 0"
+                  class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
+                >
+                  {{ bulkTeachersPreview.length }} Guru Terdeteksi
+                </span>
+              </div>
+              <span v-if="!canSaveBulkTeachers && bulkTeachersPreview.length > 0" class="text-rose-600 dark:text-rose-400 font-bold text-[11px] flex items-center gap-1">
+                <span>⚠️</span>
+                <span>Ada kode guru yang bentrok / belum valid</span>
+              </span>
+            </div>
+
+            <div v-if="bulkTeachersPreview.length === 0" class="py-6 text-center text-slate-400 text-xs">
+              Belum ada data guru yang terbaca. Silakan paste teks dari Excel atau isi form baris di atas.
+            </div>
+
+            <div v-else class="max-h-56 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold uppercase text-[10px] sticky top-0">
+                  <tr>
+                    <th class="px-3 py-2 w-28">Kode Guru</th>
+                    <th class="px-4 py-2 w-52">Nama Lengkap</th>
+                    <th class="px-4 py-2">Mata Pelajaran yang Dibuat</th>
+                    <th class="px-3 py-2 w-32 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tr
+                    v-for="item in bulkTeachersPreview"
+                    :key="item.index"
+                    :class="item.hasConflict ? 'bg-rose-50/50 dark:bg-rose-950/20' : ''"
+                  >
+                    <td class="px-3 py-2 font-mono font-bold">
+                      <span
+                        :class="[
+                          'px-2 py-0.5 rounded-md inline-block text-[11px]',
+                          item.hasConflict
+                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300'
+                            : item.isAutoId
+                              ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                              : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                        ]"
+                      >
+                        {{ item.id }} <span v-if="item.isAutoId" class="text-[9px] font-normal opacity-80">(Auto)</span>
+                      </span>
+                    </td>
+                    <td class="px-4 py-2 font-semibold text-slate-900 dark:text-white">
+                      {{ item.name }}
+                    </td>
+                    <td class="px-4 py-2">
+                      <div v-if="item.subjects.length > 0" class="flex flex-wrap gap-1.5">
+                        <span
+                          v-for="(s, sIdx) in item.subjects"
+                          :key="sIdx"
+                          class="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 rounded-md text-[11px] font-medium"
+                        >
+                          <span class="font-mono font-bold uppercase">{{ String.fromCharCode(97 + sIdx) }}.</span> {{ s.name }} ({{ s.targetJp }} JP)
+                        </span>
+                      </div>
+                      <span v-else class="text-slate-400 italic text-[11px]">
+                        (Non-Pengajar / 0 Mapel)
+                      </span>
+                    </td>
+                    <td class="px-3 py-2 text-center">
+                      <span
+                        v-if="item.hasConflict"
+                        class="px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300 rounded font-bold text-[10px]"
+                      >
+                        {{ item.conflictMsg }}
+                      </span>
+                      <span
+                        v-else
+                        class="px-2 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 rounded font-bold text-[10px]"
+                      >
+                        ✓ Siap
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-if="bulkError" class="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-semibold">
+              ⚠️ {{ bulkError }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between gap-4">
+          <div class="text-xs text-slate-500">
+            <span v-if="bulkTeachersPreview.length > 0">
+              Total <b>{{ bulkTeachersPreview.length }}</b> guru siap ditambahkan ke database.
+            </span>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              class="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              @click="showBulkTeacherModal = false"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              :disabled="!canSaveBulkTeachers || isBulkSaving"
+              @click="saveBulkTeachers"
+              class="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95"
+            >
+              <span v-if="isBulkSaving" class="animate-spin">⏳</span>
+              <span v-else>⚡</span>
+              <span>Simpan Semua Guru ({{ bulkTeachersPreview.length }})</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

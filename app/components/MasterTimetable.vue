@@ -424,80 +424,75 @@ const teacherColumns = computed(() => {
       </div>
 
       <!-- TABLE 3: KODE GURU & SIGNATURES -->
-      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 pt-2">
-        <!-- Kode Guru Grid (3 cols) -->
-        <div class="lg:col-span-3">
-          <div class="border-2 border-slate-800 dark:border-slate-700 rounded-lg overflow-hidden">
-            <div class="bg-slate-800 text-white font-extrabold px-3 py-1 text-xs uppercase tracking-wider flex items-center justify-between">
-              <span>KODE GURU :</span>
-              <span class="text-[10px] font-normal text-slate-300">Total: {{ teachers.length }} Guru</span>
-            </div>
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-2">
+        <!-- Kode Guru Grid (7 cols) -->
+        <div class="lg:col-span-7">
+          <div class="border-2 border-slate-800 dark:border-slate-700 rounded-lg overflow-hidden h-full flex flex-col justify-between">
+            <div>
+              <div class="bg-slate-800 text-white font-extrabold px-3 py-1.5 text-xs uppercase tracking-wider flex items-center justify-between">
+                <span>KODE GURU :</span>
+                <span class="text-[10px] font-normal text-slate-300">Total: {{ teachers.length }} Guru</span>
+              </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 divide-x divide-slate-300 dark:divide-slate-700 bg-slate-50/50 dark:bg-slate-900">
-              <div
-                v-for="(col, colIndex) in teacherColumns"
-                :key="'t-col-' + colIndex"
-                class="divide-y divide-slate-200 dark:divide-slate-800"
-              >
+              <div class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-300 dark:divide-slate-700 bg-slate-50/50 dark:bg-slate-900">
                 <div
-                  v-for="t in col"
-                  :key="'t-row-' + t.id"
-                  class="px-2 py-1 text-[10px] flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  v-for="(col, colIndex) in teacherColumns"
+                  :key="'t-col-' + colIndex"
+                  class="divide-y divide-slate-200 dark:divide-slate-800"
                 >
-                  <span class="w-5 text-right font-mono font-bold text-slate-500 dark:text-slate-400 shrink-0">
-                    {{ t.id }}
-                  </span>
-                  <span class="text-slate-900 dark:text-slate-200 truncate font-medium" :title="t.name">
-                    {{ t.name }}
-                  </span>
+                  <div
+                    v-for="t in col"
+                    :key="'t-row-' + t.id"
+                    class="px-2 py-1 text-[10px] flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  >
+                    <span class="w-5 text-right font-mono font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                      {{ t.id }}
+                    </span>
+                    <span class="text-slate-900 dark:text-slate-200 truncate font-medium" :title="t.name">
+                      {{ t.name }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Official Signatures Block (1 col) -->
-        <div class="lg:col-span-1 flex flex-col justify-between p-3 bg-slate-50 dark:bg-slate-800/30 border-2 border-slate-800 dark:border-slate-700 rounded-lg text-center text-xs">
+        <!-- Official Signatures Block (5 cols for ample horizontal space) -->
+        <div class="lg:col-span-5 flex flex-col justify-between p-4 bg-slate-50 dark:bg-slate-800/30 border-2 border-slate-800 dark:border-slate-700 rounded-lg text-center">
           <div>
-            <p class="font-medium text-slate-600 dark:text-slate-400">
+            <p class="font-semibold text-slate-700 dark:text-slate-300 text-xs">
               {{ schoolSetting?.dateLocation || 'Donomulyo, 13 Juni 2026' }}
             </p>
           </div>
 
-          <div class="grid grid-cols-2 gap-4 my-3 items-end">
-            <!-- Kepala Sekolah with Seal & Stamp -->
-            <div class="relative">
-              <p class="font-bold text-[11px] mb-8">Kepala Sekolah</p>
-
-              <!-- Stamp Visual Representation -->
-              <div class="absolute inset-0 flex items-center justify-center opacity-80 pointer-events-none">
-                <div class="w-16 h-16 rounded-full border-2 border-blue-600/60 dark:border-blue-400/60 flex items-center justify-center rotate-[-12deg] text-[7px] text-blue-700 dark:text-blue-300 font-extrabold uppercase p-1 text-center">
-                  SMK ISLAM DONOMULYO
-                </div>
-              </div>
-
-              <!-- Signature placeholder -->
-              <div class="font-serif italic text-base text-slate-700 dark:text-slate-300 select-none pb-1">
-                Imam Safi'i
-              </div>
-              <p class="font-bold text-[10px] underline uppercase">
+          <div class="grid grid-cols-2 gap-4 my-3 text-center">
+            <!-- Kepala Sekolah -->
+            <div class="flex flex-col items-center justify-between min-w-0">
+              <p class="font-bold text-xs text-slate-900 dark:text-white">
+                Kepala Sekolah
+              </p>
+              <!-- Ruang Tanda Tangan & Stempel Manual -->
+              <div class="h-16"></div>
+              <p class="font-bold text-[11px] underline uppercase whitespace-nowrap tracking-tight text-slate-900 dark:text-white">
                 {{ schoolSetting?.headmasterName || "IMAM SAFI'I, S.Pd., M.Si" }}
               </p>
             </div>
 
             <!-- Wakakur -->
-            <div>
-              <p class="font-bold text-[11px] mb-8">Wakakur</p>
-              <div class="font-serif italic text-base text-slate-700 dark:text-slate-300 select-none pb-1">
-                Wahyu Dian P.
-              </div>
-              <p class="font-bold text-[10px] underline uppercase">
+            <div class="flex flex-col items-center justify-between min-w-0">
+              <p class="font-bold text-xs text-slate-900 dark:text-white">
+                Wakakur
+              </p>
+              <!-- Ruang Tanda Tangan Manual -->
+              <div class="h-16"></div>
+              <p class="font-bold text-[11px] underline uppercase whitespace-nowrap tracking-tight text-slate-900 dark:text-white">
                 {{ schoolSetting?.curriculumHeadName || 'WAHYU DIAN PERMANA, S.Pd' }}
               </p>
             </div>
           </div>
 
-          <div class="text-[9px] text-slate-400 italic">
+          <div class="text-[10px] text-slate-400 italic">
             Dokumen Resmi Jadwal Pembelajaran
           </div>
         </div>
