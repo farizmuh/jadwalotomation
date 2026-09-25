@@ -28,6 +28,48 @@ const busyTeachersInCurrentSlot = computed(() => {
     .map((i: any) => i.teacherId)
 })
 
+// Theme Mode (Light / Dark)
+const colorMode = useColorMode()
+const isDark = computed({
+  get() {
+    return colorMode.value === 'dark'
+  },
+  set(val: boolean) {
+    colorMode.preference = val ? 'dark' : 'light'
+    if (typeof document !== 'undefined') {
+      if (val) {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+    }
+  }
+})
+
+function toggleColorMode() {
+  isDark.value = !isDark.value
+}
+
+onMounted(() => {
+  if (typeof document !== 'undefined') {
+    if (colorMode.value === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }
+})
+
+watch(() => colorMode.value, (newVal) => {
+  if (typeof document !== 'undefined') {
+    if (newVal === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }
+})
+
 function handleCellClick(payload: any) {
   selectedSlotForEdit.value = payload
   showEditModal.value = true
@@ -119,7 +161,7 @@ function exportExcel() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-100/70 dark:bg-slate-950 p-3 sm:p-6 lg:p-8 space-y-6">
+  <div class="min-h-screen bg-slate-100/70 dark:bg-slate-950 p-3 sm:p-6 lg:p-8 space-y-6 print:p-0 print:m-0 print:space-y-0 print:min-h-0 print:bg-white">
     <!-- Notification Banner -->
     <div
       v-if="actionNotification"
@@ -219,6 +261,18 @@ function exportExcel() {
           >
             <span>🔄</span>
             <span class="hidden sm:inline ml-1">Reset Template</span>
+          </button>
+
+          <!-- Light / Dark Mode Toggle Button -->
+          <button
+            type="button"
+            @click="toggleColorMode"
+            class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-2xs cursor-pointer active:scale-95"
+            :title="isDark ? 'Beralih ke Tampilan Terang (Light Mode)' : 'Beralih ke Tampilan Gelap (Dark Mode)'"
+          >
+            <span v-if="isDark" class="text-amber-500 text-sm">☀️</span>
+            <span v-else class="text-indigo-600 dark:text-indigo-400 text-sm">🌙</span>
+            <span>{{ isDark ? 'Mode Terang' : 'Mode Gelap' }}</span>
           </button>
         </div>
       </div>

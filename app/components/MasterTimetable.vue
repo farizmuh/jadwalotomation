@@ -99,24 +99,24 @@ const teacherColumns = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6 print:space-y-0">
     <!-- Paper Sheet Container -->
     <div
       id="printable-schedule"
-      class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl shadow-lg p-4 sm:p-6 overflow-x-auto text-slate-900 dark:text-slate-100"
+      class="printable-area bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl shadow-lg p-4 sm:p-6 print:p-0 print:m-0 print:border-none print:shadow-none overflow-x-auto text-slate-900 dark:text-slate-100"
     >
       <!-- School Header -->
-      <div class="text-center mb-5 pb-3 border-b border-slate-200 dark:border-slate-800">
-        <h1 class="font-extrabold text-lg sm:text-xl tracking-wide uppercase text-slate-900 dark:text-white">
+      <div class="text-center mb-5 pb-3 border-b border-slate-200 dark:border-slate-800 print:mb-1 print:pb-0.5">
+        <h1 class="font-extrabold text-lg sm:text-xl tracking-wide uppercase text-slate-900 dark:text-white print:text-[11px] print:mb-0">
           JADWAL PELAJARAN {{ schoolSetting?.semester || 'SEMESTER GANJIL' }} {{ schoolSetting?.schoolName || 'SMKS ISLAM DONOMULYO' }}
         </h1>
-        <h2 class="font-bold text-sm sm:text-base tracking-wider uppercase text-slate-700 dark:text-slate-300">
+        <h2 class="font-bold text-sm sm:text-base tracking-wider uppercase text-slate-700 dark:text-slate-300 print:text-[9.5px]">
           {{ schoolSetting?.academicYear || 'TAHUN AJARAN 2026-2027' }}
         </h2>
       </div>
 
       <!-- TABLE 1: SENIN, SELASA, RABU -->
-      <div class="mb-6 overflow-x-auto">
+      <div class="mb-6 overflow-x-auto print:mb-1 print:overflow-visible">
         <table class="w-full border-collapse border-2 border-slate-800 dark:border-slate-700 text-center text-[11px] leading-tight select-none">
           <thead>
             <!-- Row 1: Day Names -->
@@ -260,7 +260,7 @@ const teacherColumns = computed(() => {
       </div>
 
       <!-- TABLE 2: KAMIS, JUM'AT + PEMBINA EKSTRAKURIKULER SIDEBAR -->
-      <div class="mb-6 overflow-x-auto">
+      <div class="mb-6 overflow-x-auto print:mb-1 print:overflow-visible">
         <table class="w-full border-collapse border-2 border-slate-800 dark:border-slate-700 text-center text-[11px] leading-tight select-none">
           <thead>
             <!-- Row 1: Day Names -->
@@ -316,7 +316,7 @@ const teacherColumns = computed(() => {
 
           <tbody>
             <tr
-              v-for="slotIdx in Math.max(...bottomDays.map((d) => d.timeSlots.length))"
+              v-for="slotIdx in Math.max((extracurriculars || []).length, ...bottomDays.map((d) => d.timeSlots.length))"
               :key="'bot-slot-' + slotIdx"
               class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40"
             >
@@ -424,17 +424,17 @@ const teacherColumns = computed(() => {
       </div>
 
       <!-- TABLE 3: KODE GURU & SIGNATURES -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-2">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-2 print:grid-cols-12 print:gap-2 print:pt-0.5">
         <!-- Kode Guru Grid (7 cols) -->
         <div class="lg:col-span-7">
-          <div class="border-2 border-slate-800 dark:border-slate-700 rounded-lg overflow-hidden h-full flex flex-col justify-between">
+          <div class="border-2 border-slate-800 dark:border-slate-700 rounded-lg overflow-hidden h-full flex flex-col justify-between print:rounded-md print:border">
             <div>
-              <div class="bg-slate-800 text-white font-extrabold px-3 py-1.5 text-xs uppercase tracking-wider flex items-center justify-between">
+              <div class="bg-slate-800 text-white font-extrabold px-3 py-1.5 text-xs uppercase tracking-wider flex items-center justify-between print:py-0.5 print:px-1.5 print:text-[8px]">
                 <span>KODE GURU :</span>
-                <span class="text-[10px] font-normal text-slate-300">Total: {{ teachers.length }} Guru</span>
+                <span class="text-[10px] font-normal text-slate-300 print:text-[7.5px]">Total: {{ teachers.length }} Guru</span>
               </div>
 
-              <div class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-300 dark:divide-slate-700 bg-slate-50/50 dark:bg-slate-900">
+              <div class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-300 dark:divide-slate-700 bg-slate-50/50 dark:bg-slate-900 print:grid-cols-4">
                 <div
                   v-for="(col, colIndex) in teacherColumns"
                   :key="'t-col-' + colIndex"
@@ -443,9 +443,9 @@ const teacherColumns = computed(() => {
                   <div
                     v-for="t in col"
                     :key="'t-row-' + t.id"
-                    class="px-2 py-1 text-[10px] flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                    class="px-2 py-1 text-[10px] flex items-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition print:py-0.2 print:px-1 print:text-[7.5px] print:gap-1"
                   >
-                    <span class="w-5 text-right font-mono font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                    <span class="w-5 text-right font-mono font-bold text-slate-500 dark:text-slate-400 shrink-0 print:w-3.5">
                       {{ t.id }}
                     </span>
                     <span class="text-slate-900 dark:text-slate-200 truncate font-medium" :title="t.name">
@@ -459,40 +459,40 @@ const teacherColumns = computed(() => {
         </div>
 
         <!-- Official Signatures Block (5 cols for ample horizontal space) -->
-        <div class="lg:col-span-5 flex flex-col justify-between p-4 bg-slate-50 dark:bg-slate-800/30 border-2 border-slate-800 dark:border-slate-700 rounded-lg text-center">
+        <div class="lg:col-span-5 flex flex-col justify-between p-4 bg-slate-50 dark:bg-slate-800/30 border-2 border-slate-800 dark:border-slate-700 rounded-lg text-center print:p-1.5 print:rounded-md print:border">
           <div>
-            <p class="font-semibold text-slate-700 dark:text-slate-300 text-xs">
+            <p class="font-semibold text-slate-700 dark:text-slate-300 text-xs print:text-[8.5px]">
               {{ schoolSetting?.dateLocation || 'Donomulyo, 13 Juni 2026' }}
             </p>
           </div>
 
-          <div class="grid grid-cols-2 gap-4 my-3 text-center">
+          <div class="grid grid-cols-2 gap-4 my-3 text-center print:my-1 print:gap-2">
             <!-- Kepala Sekolah -->
             <div class="flex flex-col items-center justify-between min-w-0">
-              <p class="font-bold text-xs text-slate-900 dark:text-white">
+              <p class="font-bold text-xs text-slate-900 dark:text-white print:text-[8.5px]">
                 Kepala Sekolah
               </p>
               <!-- Ruang Tanda Tangan & Stempel Manual -->
-              <div class="h-16"></div>
-              <p class="font-bold text-[11px] underline uppercase whitespace-nowrap tracking-tight text-slate-900 dark:text-white">
+              <div class="h-16 print:h-8"></div>
+              <p class="font-bold text-[11px] underline uppercase whitespace-nowrap tracking-tight text-slate-900 dark:text-white print:text-[8px]">
                 {{ schoolSetting?.headmasterName || "IMAM SAFI'I, S.Pd., M.Si" }}
               </p>
             </div>
 
             <!-- Wakakur -->
             <div class="flex flex-col items-center justify-between min-w-0">
-              <p class="font-bold text-xs text-slate-900 dark:text-white">
+              <p class="font-bold text-xs text-slate-900 dark:text-white print:text-[8.5px]">
                 Wakakur
               </p>
               <!-- Ruang Tanda Tangan Manual -->
-              <div class="h-16"></div>
-              <p class="font-bold text-[11px] underline uppercase whitespace-nowrap tracking-tight text-slate-900 dark:text-white">
+              <div class="h-16 print:h-8"></div>
+              <p class="font-bold text-[11px] underline uppercase whitespace-nowrap tracking-tight text-slate-900 dark:text-white print:text-[8px]">
                 {{ schoolSetting?.curriculumHeadName || 'WAHYU DIAN PERMANA, S.Pd' }}
               </p>
             </div>
           </div>
 
-          <div class="text-[10px] text-slate-400 italic">
+          <div class="text-[10px] text-slate-400 italic print:text-[7.5px]">
             Dokumen Resmi Jadwal Pembelajaran
           </div>
         </div>

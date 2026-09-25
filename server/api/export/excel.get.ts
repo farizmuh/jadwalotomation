@@ -179,7 +179,7 @@ export default defineEventHandler(async (event) => {
     rMajorB.font = { bold: true, size: 10 }
     rMajorB.alignment = { horizontal: 'center' }
 
-    const maxSlotsBottom = Math.max(...bottomDays.map((d) => d.timeSlots.length))
+    const maxSlotsBottom = Math.max(extracurriculars.length, ...bottomDays.map((d) => d.timeSlots.length))
     for (let slotIdx = 0; slotIdx < maxSlotsBottom; slotIdx++) {
       const refSlot = bottomDays[0]?.timeSlots[slotIdx]
       const periodLabel = refSlot?.period ? String(refSlot.period) : ''

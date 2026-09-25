@@ -408,26 +408,26 @@ function printTeacherSchedule() {
     </div>
 
     <!-- Teacher Printable Schedule Card -->
-    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-md text-slate-900 dark:text-white space-y-4">
+    <div class="printable-area bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-md text-slate-900 dark:text-white space-y-4 print:p-0 print:m-0 print:border-none print:shadow-none print:space-y-1.5">
       <!-- Header -->
-      <div class="border-b border-slate-200 dark:border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div class="border-b border-slate-200 dark:border-slate-800 pb-4 print:pb-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 print:flex-row">
         <div>
-          <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+          <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 print:text-[9px]">
             Jadwal Mengajar Personal
           </span>
-          <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white mt-0.5">
+          <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white mt-0.5 print:text-sm print:mt-0">
             {{ currentTeacher?.name }}
           </h2>
-          <p class="text-xs text-slate-500 mt-0.5">
+          <p class="text-xs text-slate-500 mt-0.5 print:text-[9px]">
             Kode Guru: <span class="font-bold font-mono text-emerald-600">[{{ currentTeacher?.id }}]</span> • {{ schoolSetting?.schoolName || 'SMKS ISLAM DONOMULYO' }}
           </p>
         </div>
 
         <div class="text-right">
-          <p class="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+          <p class="text-xs text-slate-500 uppercase tracking-wider font-semibold print:text-[9px]">
             {{ schoolSetting?.semester || 'SEMESTER GANJIL' }}
           </p>
-          <p class="text-xs font-bold text-slate-700 dark:text-slate-300">
+          <p class="text-xs font-bold text-slate-700 dark:text-slate-300 print:text-[9.5px]">
             {{ schoolSetting?.academicYear || 'TAHUN AJARAN 2026-2027' }}
           </p>
         </div>
@@ -442,19 +442,19 @@ function printTeacherSchedule() {
       </div>
 
       <!-- Days Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 print:grid-cols-5 print:gap-1.5">
         <div
           v-for="d in weeklyGrid"
           :key="'wg-day-' + d.day.id"
-          class="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50/50 dark:bg-slate-800/30 flex flex-col shadow-xs"
+          class="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50/50 dark:bg-slate-800/30 flex flex-col shadow-xs print:rounded-lg print:border-slate-400"
         >
           <!-- Day Name -->
-          <div class="bg-slate-800 text-white font-extrabold text-center py-2.5 text-xs uppercase tracking-wider">
+          <div class="bg-slate-800 text-white font-extrabold text-center py-2.5 text-xs uppercase tracking-wider print:py-0.5 print:text-[9px]">
             {{ d.day.name }}
           </div>
 
           <!-- Slots -->
-          <div class="p-2 space-y-1.5 flex-1">
+          <div class="p-2 space-y-1.5 flex-1 print:p-0.5 print:space-y-0.5">
             <template v-for="(s, sIdx) in d.slots" :key="'slot-t-' + sIdx">
               <!-- Break Slot -->
               <div

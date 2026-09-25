@@ -12,12 +12,12 @@ const emit = defineEmits<{
   (e: 'refreshed'): void
 }>()
 
-const activeTab = useState<'school' | 'teachers' | 'classrooms' | 'timeslots' | 'piket'>('settings_active_tab', () => 'school')
+const activeTab = useState<'school' | 'teachers' | 'classrooms' | 'timeslots' | 'piket' | 'ekskul'>('settings_active_tab', () => 'school')
 
 onMounted(() => {
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem('settings_active_tab')
-    if (saved && ['school', 'teachers', 'classrooms', 'timeslots', 'piket'].includes(saved)) {
+    if (saved && ['school', 'teachers', 'classrooms', 'timeslots', 'piket', 'ekskul'].includes(saved)) {
       activeTab.value = saved as any
     }
   }
@@ -696,6 +696,158 @@ async function savePiket() {
   }
 }
 
+// --- 6. EXTRACURRICULAR (EKSKUL) & PEMBINA MANAGEMENT ---
+function parseLeaders(leaderStr: string): string[] {
+  if (!leaderStr || leaderStr.trim() === '-' || leaderStr.trim() === '') return []
+  return leaderStr.split('/').map((s) => s.trim()).filter(Boolean)
+}
+
+const newEkskul = reactive({
+  name: '',
+  orderIndex: 1,
+  leaders: [] as string[],
+  selectedTeacherId: '' as string | number,
+  customLeaderName: ''
+})
+
+function addTeacherToNewEkskul() {
+  if (!newEkskul.selectedTeacherId) return
+  const teacher = props.teachers.find((t) => t.id === Number(newEkskul.selectedTeacherId))
+  if (teacher && !newEkskul.leaders.includes(teacher.name)) {
+    newEkskul.leaders.push(teacher.name)
+  }
+  newEkskul.selectedTeacherId = ''
+}
+
+function addCustomLeaderToNewEkskul() {
+  const name = newEkskul.customLeaderName.trim()
+  if (name && !newEkskul.leaders.includes(name)) {
+    newEkskul.leaders.push(name)
+  }
+  newEkskul.customLeaderName = ''
+}
+
+function removeLeaderFromNewEkskul(index: number) {
+  newEkskul.leaders.splice(index, 1)
+}
+
+async function addEkskul() {
+  if (!newEkskul.name.trim()) {
+    showNotification('error', 'Nama ekstrakurikuler harus diisi')
+    return
+  }
+  isSaving.value = true
+  try {
+    const res: any = await $fetch('/api/extracurriculars', {
+      method: 'POST',
+      body: {
+        name: newEkskul.name.trim(),
+        orderIndex: Number(newEkskul.orderIndex) || (props.extracurriculars?.length || 0) + 1,
+        leaders: newEkskul.leaders
+      }
+    })
+    if (res.success) {
+      showNotification('success', `Ekstrakurikuler '${newEkskul.name}' berhasil ditambahkan!`)
+      newEkskul.name = ''
+      newEkskul.leaders = []
+      newEkskul.orderIndex = (props.extracurriculars?.length || 0) + 2
+      emit('refreshed')
+    } else {
+      showNotification('error', res.error || 'Gagal menambahkan ekstrakurikuler')
+    }
+  } catch (err: any) {
+    showNotification('error', err.data?.message || err.message || 'Terjadi kesalahan')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+// Edit Ekskul Modal
+const editingEkskul = ref<any>(null)
+const editEkskulForm = reactive({
+  name: '',
+  orderIndex: 1,
+  leaders: [] as string[],
+  selectedTeacherId: '' as string | number,
+  customLeaderName: ''
+})
+
+function openEditEkskul(item: any) {
+  editingEkskul.value = item
+  editEkskulForm.name = item.name
+  editEkskulForm.orderIndex = item.orderIndex || 1
+  editEkskulForm.leaders = parseLeaders(item.leader)
+  editEkskulForm.selectedTeacherId = ''
+  editEkskulForm.customLeaderName = ''
+}
+
+function addTeacherToEditEkskul() {
+  if (!editEkskulForm.selectedTeacherId) return
+  const teacher = props.teachers.find((t) => t.id === Number(editEkskulForm.selectedTeacherId))
+  if (teacher && !editEkskulForm.leaders.includes(teacher.name)) {
+    editEkskulForm.leaders.push(teacher.name)
+  }
+  editEkskulForm.selectedTeacherId = ''
+}
+
+function addCustomLeaderToEditEkskul() {
+  const name = editEkskulForm.customLeaderName.trim()
+  if (name && !editEkskulForm.leaders.includes(name)) {
+    editEkskulForm.leaders.push(name)
+  }
+  editEkskulForm.customLeaderName = ''
+}
+
+function removeLeaderFromEditEkskul(index: number) {
+  editEkskulForm.leaders.splice(index, 1)
+}
+
+async function saveEditEkskul() {
+  if (!editingEkskul.value || !editEkskulForm.name.trim()) return
+  isSaving.value = true
+  try {
+    const res: any = await $fetch(`/api/extracurriculars/${editingEkskul.value.id}`, {
+      method: 'PUT',
+      body: {
+        name: editEkskulForm.name.trim(),
+        orderIndex: Number(editEkskulForm.orderIndex),
+        leaders: editEkskulForm.leaders
+      }
+    })
+    if (res.success) {
+      showNotification('success', 'Ekstrakurikuler berhasil diperbarui!')
+      editingEkskul.value = null
+      emit('refreshed')
+    } else {
+      showNotification('error', res.error || 'Gagal memperbarui ekstrakurikuler')
+    }
+  } catch (err: any) {
+    showNotification('error', err.data?.message || err.message || 'Terjadi kesalahan')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function deleteEkskul(item: any) {
+  if (!confirm(`Hapus ekstrakurikuler '${item.name}'?`)) return
+  isSaving.value = true
+  try {
+    const res: any = await $fetch(`/api/extracurriculars/${item.id}`, {
+      method: 'DELETE'
+    })
+    if (res.success) {
+      showNotification('success', `Ekstrakurikuler '${item.name}' berhasil dihapus`)
+      emit('refreshed')
+    } else {
+      showNotification('error', res.error || 'Gagal menghapus')
+    }
+  } catch (err: any) {
+    showNotification('error', err.data?.message || err.message || 'Terjadi kesalahan')
+  } finally {
+    isSaving.value = false
+  }
+}
+
 // Day management
 const newDayName = ref('')
 
@@ -871,7 +1023,8 @@ async function saveEditSlot() {
           { key: 'teachers', label: 'Daftar & Kode Guru', icon: '👨‍🏫' },
           { key: 'classrooms', label: 'Kelas & Jurusan', icon: '👥' },
           { key: 'timeslots', label: 'Hari, Jam & Istirahat', icon: '⏰' },
-          { key: 'piket', label: 'Guru Piket Harian', icon: '📋' }
+          { key: 'piket', label: 'Guru Piket Harian', icon: '📋' },
+          { key: 'ekskul', label: 'Ekstrakurikuler & Pembina', icon: '🏆' }
         ]"
         :key="tab.key"
         :class="[
@@ -2129,6 +2282,366 @@ async function saveEditSlot() {
             Simpan Seluruh Guru Piket
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: EXTRACURRICULAR (EKSKUL) & PEMBINA -->
+    <div v-if="activeTab === 'ekskul'" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="font-extrabold text-lg text-slate-900 dark:text-white flex items-center gap-2">
+            <span>🏆</span>
+            <span>Kelola Ekstrakurikuler & Pembina</span>
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Daftar kegiatan ekstrakurikuler sekolah beserta pembina penanggung jawab. Mendukung lebih dari 1 pembina per ekskul.
+          </p>
+        </div>
+        <div class="text-xs text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl">
+          Total: {{ extracurriculars?.length || 0 }} Ekstrakurikuler
+        </div>
+      </div>
+
+      <!-- Form Add Ekskul -->
+      <form @submit.prevent="addEkskul" class="p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl space-y-4">
+        <h4 class="font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+          <span>➕</span>
+          <span>Tambah Ekstrakurikuler Baru</span>
+        </h4>
+
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+          <div class="sm:col-span-6">
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+              Nama Ekstrakurikuler *
+            </label>
+            <input
+              v-model="newEkskul.name"
+              type="text"
+              required
+              placeholder="Contoh: Pramuka, PMR, Futsal, Tari, Banjari"
+              class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold"
+            />
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+              Urutan Slot
+            </label>
+            <input
+              v-model="newEkskul.orderIndex"
+              type="number"
+              min="1"
+              max="20"
+              class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-center"
+            />
+          </div>
+
+          <div class="sm:col-span-4 self-end">
+            <button
+              type="submit"
+              :disabled="isSaving"
+              class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>+ Simpan Ekstrakurikuler</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Multi Pembina Selector -->
+        <div class="p-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+              Atur Pembina Penanggung Jawab (Boleh Lebih dari 1 Pembina):
+            </label>
+            <span class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+              {{ newEkskul.leaders.length }} Pembina Dipilih
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Option 1: Pick from Teachers -->
+            <div class="flex items-center gap-2">
+              <select
+                v-model="newEkskul.selectedTeacherId"
+                class="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold"
+              >
+                <option value="">-- Pilih Guru Sekolah --</option>
+                <option v-for="t in teachers" :key="t.id" :value="t.id">
+                  [{{ t.id }}] {{ t.name }}
+                </option>
+              </select>
+              <button
+                type="button"
+                @click="addTeacherToNewEkskul"
+                class="px-3 py-2 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs rounded-xl transition whitespace-nowrap cursor-pointer"
+              >
+                + Tambah Guru
+              </button>
+            </div>
+
+            <!-- Option 2: Custom Outside Coach -->
+            <div class="flex items-center gap-2">
+              <input
+                v-model="newEkskul.customLeaderName"
+                type="text"
+                placeholder="Atau ketik nama pelatih luar..."
+                @keydown.enter.prevent="addCustomLeaderToNewEkskul"
+                class="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs"
+              />
+              <button
+                type="button"
+                @click="addCustomLeaderToNewEkskul"
+                class="px-3 py-2 bg-teal-100 hover:bg-teal-200 dark:bg-teal-950/60 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 font-bold text-xs rounded-xl transition whitespace-nowrap cursor-pointer"
+              >
+                + Tambah Luar
+              </button>
+            </div>
+          </div>
+
+          <!-- Active Pembina Badges -->
+          <div class="pt-1">
+            <div v-if="newEkskul.leaders.length === 0" class="text-[11px] text-slate-400 italic">
+              * Belum ada pembina yang ditambahkan. Anda dapat memilih dari daftar guru di atas atau memasukkan nama pelatih dari luar.
+            </div>
+            <div v-else class="flex flex-wrap gap-2 items-center">
+              <span class="text-[10px] uppercase font-bold text-slate-400 mr-1">Daftar Pembina:</span>
+              <span
+                v-for="(ldr, lIdx) in newEkskul.leaders"
+                :key="lIdx"
+                class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 rounded-xl text-xs font-semibold shadow-2xs"
+              >
+                <span>👨‍🏫 {{ ldr }}</span>
+                <button
+                  type="button"
+                  @click="removeLeaderFromNewEkskul(lIdx)"
+                  class="w-4 h-4 rounded-full hover:bg-emerald-200 dark:hover:bg-emerald-800 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-[10px] ml-1 transition cursor-pointer"
+                  title="Hapus pembina ini"
+                >
+                  ✕
+                </button>
+              </span>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <!-- Table of Extracurriculars -->
+      <div class="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-2xl">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold uppercase text-[10px] tracking-wider">
+            <tr>
+              <th class="px-3 py-2.5 w-16 text-center">Slot</th>
+              <th class="px-4 py-2.5 w-44">Nama Ekstrakurikuler</th>
+              <th class="px-4 py-2.5">Pembina Penanggung Jawab</th>
+              <th class="px-4 py-2.5 w-32 text-center">Jumlah Pembina</th>
+              <th class="px-3 py-2.5 w-36 text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+            <tr
+              v-for="item in extracurriculars"
+              :key="item.id"
+              class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition"
+            >
+              <td class="px-3 py-2.5 text-center font-mono font-bold">
+                <span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px]">
+                  #{{ item.orderIndex }}
+                </span>
+              </td>
+              <td class="px-4 py-2.5 font-extrabold text-slate-900 dark:text-white">
+                {{ item.name }}
+              </td>
+              <td class="px-4 py-2.5">
+                <div v-if="parseLeaders(item.leader).length > 0" class="flex flex-wrap gap-1.5">
+                  <span
+                    v-for="(p, pIdx) in parseLeaders(item.leader)"
+                    :key="pIdx"
+                    class="px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold"
+                  >
+                    {{ p }}
+                  </span>
+                </div>
+                <span v-else class="text-slate-400 italic text-[11px]">- Belum ada pembina -</span>
+              </td>
+              <td class="px-4 py-2.5 text-center">
+                <span
+                  :class="[
+                    'px-2 py-0.5 rounded-full text-[10px] font-bold',
+                    parseLeaders(item.leader).length > 1
+                      ? 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300'
+                      : parseLeaders(item.leader).length === 1
+                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                        : 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300'
+                  ]"
+                >
+                  {{ parseLeaders(item.leader).length }} Pembina
+                </span>
+              </td>
+              <td class="px-3 py-2.5 text-right space-x-1 whitespace-nowrap">
+                <button
+                  type="button"
+                  @click="openEditEkskul(item)"
+                  class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-[11px] transition cursor-pointer"
+                >
+                  ✏️ Edit
+                </button>
+                <button
+                  type="button"
+                  @click="deleteEkskul(item)"
+                  class="px-2 py-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 font-bold rounded-lg text-[11px] transition cursor-pointer"
+                >
+                  🗑️
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!extracurriculars || extracurriculars.length === 0">
+              <td colspan="5" class="py-8 text-center text-slate-400 text-xs">
+                Belum ada data ekstrakurikuler. Tambahkan melalui form di atas.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MODAL: EDIT EKSTRAKURIKULER & PEMBINA -->
+    <div
+      v-if="editingEkskul"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto"
+    >
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
+        <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">✏️</span>
+            <div>
+              <h3 class="font-extrabold text-sm text-slate-900 dark:text-white">
+                Edit Ekstrakurikuler & Pembina
+              </h3>
+              <p class="text-[11px] text-slate-500">
+                Ubah nama kegiatan dan atur pembina yang bertanggung jawab.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg"
+            @click="editingEkskul = null"
+          >
+            ✕
+          </button>
+        </div>
+
+        <form @submit.prevent="saveEditEkskul" class="p-6 space-y-4 text-xs">
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+              Nama Ekstrakurikuler *
+            </label>
+            <input
+              v-model="editEkskulForm.name"
+              type="text"
+              required
+              class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold"
+            />
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+              Urutan Slot (#)
+            </label>
+            <input
+              v-model="editEkskulForm.orderIndex"
+              type="number"
+              min="1"
+              max="20"
+              class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold"
+            />
+          </div>
+
+          <!-- Multi Pembina Editor -->
+          <div class="p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl space-y-3">
+            <div class="flex items-center justify-between">
+              <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Daftar Pembina ({{ editEkskulForm.leaders.length }} Pembina):
+              </label>
+            </div>
+
+            <!-- Add Teacher -->
+            <div class="flex items-center gap-2">
+              <select
+                v-model="editEkskulForm.selectedTeacherId"
+                class="flex-1 px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+              >
+                <option value="">-- Pilih Guru Sekolah --</option>
+                <option v-for="t in teachers" :key="t.id" :value="t.id">
+                  [{{ t.id }}] {{ t.name }}
+                </option>
+              </select>
+              <button
+                type="button"
+                @click="addTeacherToEditEkskul"
+                class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition whitespace-nowrap cursor-pointer"
+              >
+                + Guru
+              </button>
+            </div>
+
+            <!-- Add Custom -->
+            <div class="flex items-center gap-2">
+              <input
+                v-model="editEkskulForm.customLeaderName"
+                type="text"
+                placeholder="Atau nama pelatih luar..."
+                @keydown.enter.prevent="addCustomLeaderToEditEkskul"
+                class="flex-1 px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs"
+              />
+              <button
+                type="button"
+                @click="addCustomLeaderToEditEkskul"
+                class="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-lg transition whitespace-nowrap cursor-pointer"
+              >
+                + Luar
+              </button>
+            </div>
+
+            <!-- Active Chips -->
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span
+                v-for="(ldr, lIdx) in editEkskulForm.leaders"
+                :key="lIdx"
+                class="inline-flex items-center gap-1 px-2.5 py-1 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 rounded-lg text-xs font-semibold"
+              >
+                <span>👨‍🏫 {{ ldr }}</span>
+                <button
+                  type="button"
+                  @click="removeLeaderFromEditEkskul(lIdx)"
+                  class="text-slate-400 hover:text-rose-600 font-bold ml-1"
+                >
+                  ✕
+                </button>
+              </span>
+              <span v-if="editEkskulForm.leaders.length === 0" class="text-[11px] text-slate-400 italic">
+                Belum ada pembina
+              </span>
+            </div>
+          </div>
+
+          <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-200 dark:border-slate-800">
+            <button
+              type="button"
+              class="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold rounded-xl transition cursor-pointer"
+              @click="editingEkskul = null"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              :disabled="isSaving"
+              class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow transition cursor-pointer"
+            >
+              Simpan Perubahan
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
