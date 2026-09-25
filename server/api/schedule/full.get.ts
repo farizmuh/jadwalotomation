@@ -42,7 +42,8 @@ export default defineEventHandler(async () => {
         include: {
           teacher: true,
           classroom: true,
-          timeSlot: true
+          timeSlot: true,
+          subject: true
         }
       })
     ])

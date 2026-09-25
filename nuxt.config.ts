@@ -5,6 +5,12 @@ export default defineNuxtConfig({
     '@nuxt/ui'
   ],
 
+  runtimeConfig: {
+    adminUsername: process.env.ADMIN_USERNAME || 'admin',
+    adminPassword: process.env.ADMIN_PASSWORD || 'admin123',
+    authSecret: process.env.AUTH_SECRET || 'default-secret-change-me'
+  },
+
   appConfig: {
     ui: {
       colors: {

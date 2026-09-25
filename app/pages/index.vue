@@ -4,6 +4,32 @@ const { data, refresh, pending } = await useFetch('/api/schedule/full')
 
 const currentTab = ref<'master' | 'teacher' | 'classroom' | 'settings'>('master')
 
+// Auth state
+const isAdmin = ref(false)
+const isCheckingAuth = ref(true)
+
+async function checkAuth() {
+  try {
+    const res: any = await $fetch('/api/auth/me')
+    isAdmin.value = res.authenticated === true
+  } catch {
+    isAdmin.value = false
+  } finally {
+    isCheckingAuth.value = false
+  }
+}
+
+async function handleLogout() {
+  try {
+    await $fetch('/api/auth/logout', { method: 'POST' })
+    isAdmin.value = false
+    currentTab.value = 'master'
+    showToast('success', 'Berhasil logout dari sistem')
+  } catch {
+    showToast('error', 'Gagal logout')
+  }
+}
+
 // Modals
 const showEditModal = ref(false)
 const selectedSlotForEdit = ref<any>(null)
@@ -58,6 +84,7 @@ onMounted(() => {
       document.documentElement.classList.remove('dark')
     }
   }
+  checkAuth()
 })
 
 watch(() => colorMode.value, (newVal) => {
@@ -71,6 +98,10 @@ watch(() => colorMode.value, (newVal) => {
 })
 
 function handleCellClick(payload: any) {
+  if (!isAdmin.value) {
+    showToast('error', 'Anda harus login sebagai admin untuk mengedit jadwal')
+    return
+  }
   selectedSlotForEdit.value = payload
   showEditModal.value = true
 }
@@ -219,19 +250,34 @@ function exportExcel() {
             </span>
           </button>
 
-          <!-- Auto-Generate Button -->
-          <button
-            type="button"
-            :disabled="isGenerating"
-            class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5 disabled:opacity-50"
-            @click="triggerAutoGenerate(true)"
-          >
-            <span v-if="isGenerating" class="animate-spin">⏳</span>
-            <span v-else>⚡</span>
-            <span>Auto-Generate</span>
-          </button>
+          <!-- Admin-Only Action Buttons -->
+          <template v-if="isAdmin">
+            <!-- Auto-Generate Button -->
+            <button
+              type="button"
+              :disabled="isGenerating"
+              class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5 disabled:opacity-50"
+              @click="triggerAutoGenerate(true)"
+            >
+              <span v-if="isGenerating" class="animate-spin">⏳</span>
+              <span v-else>⚡</span>
+              <span>Auto-Generate</span>
+            </button>
 
-          <!-- Export Excel -->
+            <!-- Reset Template -->
+            <button
+              type="button"
+              :disabled="isResetting"
+              class="px-3 py-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              title="Reset ke Template Asli dari Gambar"
+              @click="triggerResetTemplate"
+            >
+              <span>🔄</span>
+              <span class="hidden sm:inline ml-1">Reset Template</span>
+            </button>
+          </template>
+
+          <!-- Export Excel (Public) -->
           <button
             type="button"
             class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 text-xs font-bold rounded-xl transition flex items-center gap-1.5"
@@ -241,7 +287,7 @@ function exportExcel() {
             <span>Ekspor Excel (.xlsx)</span>
           </button>
 
-          <!-- Print PDF -->
+          <!-- Print PDF (Public) -->
           <button
             type="button"
             class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5"
@@ -249,18 +295,6 @@ function exportExcel() {
           >
             <span>🖨️</span>
             <span>Cetak / PDF</span>
-          </button>
-
-          <!-- Reset Template -->
-          <button
-            type="button"
-            :disabled="isResetting"
-            class="px-3 py-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 text-xs font-semibold rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-            title="Reset ke Template Asli dari Gambar"
-            @click="triggerResetTemplate"
-          >
-            <span>🔄</span>
-            <span class="hidden sm:inline ml-1">Reset Template</span>
           </button>
 
           <!-- Light / Dark Mode Toggle Button -->
@@ -274,6 +308,25 @@ function exportExcel() {
             <span v-else class="text-indigo-600 dark:text-indigo-400 text-sm">🌙</span>
             <span>{{ isDark ? 'Mode Terang' : 'Mode Gelap' }}</span>
           </button>
+
+          <!-- Login / Logout Button -->
+          <NuxtLink
+            v-if="!isAdmin && !isCheckingAuth"
+            to="/login"
+            class="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold rounded-xl shadow-md shadow-amber-500/20 transition flex items-center gap-1.5"
+          >
+            <span>🔐</span>
+            <span>Login Admin</span>
+          </NuxtLink>
+          <button
+            v-if="isAdmin"
+            type="button"
+            @click="handleLogout"
+            class="px-3.5 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800 text-xs font-bold rounded-xl transition flex items-center gap-1.5"
+          >
+            <span>🚪</span>
+            <span>Logout</span>
+          </button>
         </div>
       </div>
 
@@ -281,11 +334,11 @@ function exportExcel() {
       <div class="flex items-center gap-2 border-t border-slate-200 dark:border-slate-800 pt-3 overflow-x-auto">
         <button
           v-for="tab in [
-            { key: 'master', label: 'Matriks Master (Seperti di Foto)', icon: '📊' },
-            { key: 'teacher', label: 'Jadwal per Guru', icon: '👨‍🏫' },
-            { key: 'classroom', label: 'Jadwal per Kelas', icon: '🏫' },
-            { key: 'settings', label: 'Pengaturan & Master Data', icon: '⚙️' }
-          ]"
+            { key: 'master', label: 'Matriks Master (Seperti di Foto)', icon: '📊', adminOnly: false },
+            { key: 'teacher', label: 'Jadwal per Guru', icon: '👨‍🏫', adminOnly: true },
+            { key: 'classroom', label: 'Jadwal per Kelas', icon: '🏫', adminOnly: false },
+            { key: 'settings', label: 'Pengaturan & Master Data', icon: '⚙️', adminOnly: true }
+          ].filter(t => !t.adminOnly || isAdmin)"
           :key="tab.key"
           :class="[
             'px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 whitespace-nowrap',
@@ -298,6 +351,15 @@ function exportExcel() {
           <span>{{ tab.icon }}</span>
           <span>{{ tab.label }}</span>
         </button>
+
+        <!-- Admin Badge -->
+        <span
+          v-if="isAdmin"
+          class="ml-auto px-3 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 text-[11px] font-bold flex items-center gap-1.5"
+        >
+          <span>🛡️</span>
+          <span>Admin Mode</span>
+        </span>
       </div>
     </header>
 
