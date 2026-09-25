@@ -96,14 +96,181 @@ const teacherColumns = computed(() => {
   })
   return cols
 })
+
+// Mobile master: selected day & class
+const mobileSelDayIdx = ref(0)
+const mobileSelClassIdx = ref(0)
+
+const mobileSlots = computed(() => {
+  const day = props.days[mobileSelDayIdx.value]
+  if (!day) return []
+  const cls = props.classrooms[mobileSelClassIdx.value]
+  if (!cls) return []
+  return day.timeSlots.map((slot: any) => {
+    const item = scheduleMap.value.get(`${slot.id}_${cls.id}`)
+    const teacher = item?.teacherId ? teacherMap.value.get(item.teacherId) : null
+    const hasConflict = item?.teacherId ? conflictKeys.value.has(`${slot.id}_${item.teacherId}`) : false
+    return { slot, item, teacher, hasConflict, cls }
+  })
+})
+
+const DAY_SHORT: Record<string, string> = {
+  SENIN: 'Sen', SELASA: 'Sel', RABU: 'Rab', KAMIS: 'Kam', "JUM'AT": 'Jum', SABTU: 'Sab', MINGGU: 'Min'
+}
+function dayShort(name: string): string {
+  return DAY_SHORT[name?.toUpperCase()] || name?.slice(0, 3)
+}
 </script>
 
 <template>
-  <div class="space-y-6 print:space-y-0">
+  <div class="space-y-4 print:space-y-0">
+
+    <!-- ══════════════════════════════════════════════════════
+         MOBILE VIEW (< md): Day tabs + Class tabs + Slot cards
+         ══════════════════════════════════════════════════════ -->
+    <div class="md:hidden print:hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-md overflow-hidden">
+
+      <!-- Mobile Header -->
+      <div class="px-4 py-3 bg-gradient-to-r from-slate-800 to-slate-900 text-white">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Matriks Master</p>
+        <h2 class="text-base font-extrabold leading-tight">
+          {{ schoolSetting?.schoolName || 'SMKS ISLAM DONOMULYO' }}
+        </h2>
+        <p class="text-[10px] text-slate-400 mt-0.5">{{ schoolSetting?.semester }} · {{ schoolSetting?.academicYear }}</p>
+      </div>
+
+      <!-- Day Tabs -->
+      <div class="flex gap-1.5 px-3 pt-3 pb-2 overflow-x-auto no-scrollbar border-b border-slate-100 dark:border-slate-800">
+        <button
+          v-for="(d, idx) in days"
+          :key="'mob-day-' + idx"
+          type="button"
+          :class="[
+            'flex-1 min-w-[48px] py-1.5 px-1 rounded-xl text-center font-bold text-xs whitespace-nowrap transition',
+            mobileSelDayIdx === idx
+              ? 'bg-slate-900 dark:bg-emerald-600 text-white shadow-md'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
+          ]"
+          @click="mobileSelDayIdx = idx"
+        >
+          {{ dayShort(d.name) }}
+        </button>
+      </div>
+
+      <!-- Class Tabs -->
+      <div class="flex gap-1 px-3 pt-2 pb-2 overflow-x-auto no-scrollbar">
+        <button
+          v-for="(cls, cIdx) in classrooms"
+          :key="'mob-cls-' + cIdx"
+          type="button"
+          :class="[
+            'shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition border',
+            mobileSelClassIdx === cIdx
+              ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+              : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+          ]"
+          @click="mobileSelClassIdx = cIdx"
+        >
+          {{ cls.name }}
+        </button>
+      </div>
+
+      <!-- Slot Cards -->
+      <div class="flex flex-col gap-2 px-3 pb-4">
+        <template v-for="(s, sIdx) in mobileSlots" :key="'mob-master-' + sIdx">
+
+          <!-- Break / Special -->
+          <div
+            v-if="s.slot.slotType === 'BREAK' || s.slot.slotType === 'FRIDAY_PRAYER' || s.slot.slotType === 'CEREMONY'"
+            class="flex items-center justify-between px-4 py-3 rounded-xl"
+            :class="s.slot.slotType === 'BREAK' ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50' : s.slot.slotType === 'FRIDAY_PRAYER' ? 'bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50' : 'bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50'"
+          >
+            <span class="text-sm font-black uppercase tracking-wide"
+              :class="s.slot.slotType === 'BREAK' ? 'text-amber-700 dark:text-amber-400' : s.slot.slotType === 'FRIDAY_PRAYER' ? 'text-blue-700 dark:text-blue-400' : 'text-emerald-700 dark:text-emerald-400'"
+            >{{ s.slot.label || s.slot.slotType }}</span>
+            <span class="text-xs font-mono text-slate-400">{{ s.slot.timeDisplay }}</span>
+          </div>
+
+          <!-- Lesson Slot -->
+          <div
+            v-else-if="s.slot.period"
+            :class="[
+              'flex items-stretch rounded-2xl border overflow-hidden min-h-[68px] transition-all',
+              s.hasConflict
+                ? 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-700 shadow-sm shadow-red-200 dark:shadow-red-900'
+                : s.item?.teacherId
+                  ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/50'
+                  : 'bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700'
+            ]"
+            @click="onCellClicked(days[mobileSelDayIdx].name, s.slot, s.cls)"
+          >
+            <!-- Left accent + period -->
+            <div
+              :class="[
+                'flex flex-col items-center justify-center px-3 min-w-[52px] border-r',
+                s.hasConflict ? 'bg-red-500 text-white border-red-400' : s.item?.teacherId ? 'bg-emerald-500/10 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800/40' : 'border-slate-200 dark:border-slate-700'
+              ]"
+            >
+              <span :class="['text-xl font-black leading-none', s.hasConflict ? 'text-white' : 'text-slate-700 dark:text-slate-200']">{{ s.slot.period }}</span>
+              <span :class="['text-[9px] font-mono mt-1', s.hasConflict ? 'text-red-100' : 'text-slate-400 dark:text-slate-500']">{{ s.slot.timeStart }}</span>
+            </div>
+
+            <!-- Content -->
+            <div class="flex flex-col justify-center px-3 py-2.5 flex-1">
+              <template v-if="s.hasConflict">
+                <p class="text-sm font-black text-red-700 dark:text-red-400">⚠️ Bentrok!</p>
+                <p class="text-xs text-red-600 dark:text-red-400">
+                  {{ s.item?.teacherId }}{{ s.item?.subjectCode || '' }} · {{ s.teacher?.name }}
+                </p>
+              </template>
+              <template v-else-if="s.item?.teacherId || s.item?.customLabel">
+                <p class="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
+                  {{ s.item.customLabel || `${s.item.teacherId}${s.item.subjectCode || ''}` }}
+                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ s.teacher?.name || '-' }}</p>
+              </template>
+              <template v-else>
+                <p class="text-sm text-slate-400 dark:text-slate-600 italic">Belum diisi</p>
+              </template>
+            </div>
+
+            <!-- Right: end time -->
+            <div class="flex items-center pr-3 shrink-0">
+              <span class="text-[9px] font-mono text-slate-400 dark:text-slate-500">{{ s.slot.timeEnd }}</span>
+            </div>
+          </div>
+
+        </template>
+      </div>
+
+      <!-- Mobile Piket Info -->
+      <div class="mx-3 mb-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700">
+        <p class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">Piket Pengajar</p>
+        <div class="flex flex-wrap gap-1.5">
+          <span
+            v-if="days[mobileSelDayIdx]?.piket?.teacher1?.name || days[mobileSelDayIdx]?.piket?.teacher1Name"
+            class="px-2.5 py-1 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-xs font-semibold"
+          >
+            {{ days[mobileSelDayIdx]?.piket?.teacher1?.name || days[mobileSelDayIdx]?.piket?.teacher1Name }}
+          </span>
+          <span
+            v-if="days[mobileSelDayIdx]?.piket?.teacher2?.name || days[mobileSelDayIdx]?.piket?.teacher2Name"
+            class="px-2.5 py-1 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-xs font-semibold"
+          >
+            {{ days[mobileSelDayIdx]?.piket?.teacher2?.name || days[mobileSelDayIdx]?.piket?.teacher2Name }}
+          </span>
+          <span v-if="!days[mobileSelDayIdx]?.piket" class="text-xs text-slate-400 italic">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         DESKTOP VIEW (md+): Full master table (+ print)
+         ══════════════════════════════════════════════════════ -->
     <!-- Paper Sheet Container -->
     <div
       id="printable-schedule"
-      class="printable-area bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl shadow-lg p-4 sm:p-6 print:p-0 print:m-0 print:border-none print:shadow-none overflow-x-auto text-slate-900 dark:text-slate-100"
+      class="printable-area hidden md:block bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl shadow-lg p-4 sm:p-6 print:block print:p-0 print:m-0 print:border-none print:shadow-none overflow-x-auto text-slate-900 dark:text-slate-100"
     >
       <!-- School Header -->
       <div class="text-center mb-5 pb-3 border-b border-slate-200 dark:border-slate-800 print:mb-1 print:pb-0.5">
@@ -500,3 +667,8 @@ const teacherColumns = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
