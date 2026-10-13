@@ -2,7 +2,7 @@
 // Fetch full schedule state
 const { data, refresh, pending } = await useFetch('/api/schedule/full')
 
-const currentTab = ref<'master' | 'teacher' | 'classroom' | 'settings'>('master')
+const currentTab = ref<'master' | 'daily' | 'teacher' | 'classroom' | 'settings'>('master')
 
 // Auth state
 const isAdmin = ref(false)
@@ -335,6 +335,7 @@ function exportExcel() {
         <button
           v-for="tab in [
             { key: 'master', label: 'Matriks Master (Seperti di Foto)', icon: '📊', adminOnly: false },
+            { key: 'daily', label: 'Jadwal per Hari', icon: '📅', adminOnly: false },
             { key: 'teacher', label: 'Jadwal per Guru', icon: '👨‍🏫', adminOnly: true },
             { key: 'classroom', label: 'Jadwal per Kelas', icon: '🏫', adminOnly: false },
             { key: 'settings', label: 'Pengaturan & Master Data', icon: '⚙️', adminOnly: true }
@@ -381,6 +382,19 @@ function exportExcel() {
           :extracurriculars="data.data.extracurriculars"
           :schedule-items="data.data.scheduleItems"
           :conflicts="data.data.conflicts"
+          @cell-click="handleCellClick"
+        />
+
+        <!-- 2. Daily Schedule View -->
+        <DailyScheduleView
+          v-else-if="currentTab === 'daily'"
+          :school-setting="data.data.schoolSetting"
+          :days="data.data.days"
+          :classrooms="data.data.classrooms"
+          :teachers="data.data.teachers"
+          :schedule-items="data.data.scheduleItems"
+          :conflicts="data.data.conflicts"
+          :is-admin="isAdmin"
           @cell-click="handleCellClick"
         />
 
