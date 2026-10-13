@@ -242,7 +242,7 @@ async function clearSlot() {
               :key="t.id"
               :value="t.id"
             >
-              [{{ t.id }}] {{ t.name }} {{ (!t.subjects || t.subjects.length === 0) ? '(Non-Pengajar / Tanpa Mapel)' : '' }} {{ busyTeacherIds.includes(t.id) && t.id !== slotInfo.currentTeacherId ? '(Sedang Mengajar di Kelas Lain)' : '' }}
+              No. {{ t.id }} — {{ t.name }} {{ (!(t as any).subjects || (t as any).subjects.length === 0) ? '(Non-Pengajar / Tanpa Mapel)' : '' }} {{ busyTeacherIds.includes(t.id) && t.id !== slotInfo.currentTeacherId ? '(Sedang Mengajar di Kelas Lain)' : '' }}
             </option>
           </select>
         </div>

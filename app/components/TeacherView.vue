@@ -17,6 +17,41 @@ const currentTeacher = computed(() =>
   props.teachers.find((t) => t.id === selectedTeacherId.value)
 )
 
+// Custom Teacher Selector State
+const isDropdownOpen = ref(false)
+const teacherSearchQuery = ref('')
+const dropdownRef = ref<HTMLElement | null>(null)
+
+const filteredTeachers = computed(() => {
+  const query = teacherSearchQuery.value.trim().toLowerCase()
+  if (!query) return props.teachers
+  return props.teachers.filter((t) => {
+    const idMatch = String(t.id).includes(query)
+    const nameMatch = t.name?.toLowerCase().includes(query)
+    return idMatch || nameMatch
+  })
+})
+
+function selectTeacher(id: number) {
+  selectedTeacherId.value = id
+  isDropdownOpen.value = false
+  teacherSearchQuery.value = ''
+}
+
+function handleClickOutside(event: MouseEvent) {
+  if (dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
+    isDropdownOpen.value = false
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('click', handleClickOutside)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('click', handleClickOutside)
+})
+
 // Filter schedules for the selected teacher
 const teacherSchedules = computed(() => {
   return props.scheduleItems.filter((i) => i.teacherId === selectedTeacherId.value)
@@ -331,21 +366,123 @@ function printTeacherSchedule() {
       <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <!-- Teacher Selector -->
         <div class="flex items-center gap-3 w-full sm:w-auto">
-          <label class="text-xs font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
+          <label class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
             Pilih Guru :
           </label>
-          <select
-            v-model="selectedTeacherId"
-            class="w-full sm:w-80 px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs"
-          >
-            <option
-              v-for="t in teachers"
-              :key="t.id"
-              :value="t.id"
+
+          <div class="relative w-full sm:w-88" ref="dropdownRef">
+            <!-- Custom Trigger Button -->
+            <button
+              type="button"
+              @click="isDropdownOpen = !isDropdownOpen"
+              class="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-300 dark:border-slate-700 rounded-xl text-left shadow-xs transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
             >
-              [{{ t.id }}] {{ t.name }} {{ (!t.subjects || t.subjects.length === 0) ? '(Non-Pengajar)' : '' }}
-            </option>
-          </select>
+              <div class="flex items-center gap-2.5 min-w-0">
+                <!-- Modern Number Badge (tanpa kurung [ ]) -->
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/20 dark:text-emerald-400 font-mono font-bold text-xs ring-1 ring-emerald-500/20 shrink-0">
+                  {{ currentTeacher?.id }}
+                </span>
+                <span class="font-bold text-sm text-slate-900 dark:text-white truncate">
+                  {{ currentTeacher?.name }}
+                </span>
+                <span
+                  v-if="!currentTeacher?.subjects || currentTeacher.subjects.length === 0"
+                  class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-700 text-slate-500 dark:text-slate-400 shrink-0 hidden xs:inline-block"
+                >
+                  Non-Pengajar
+                </span>
+              </div>
+
+              <!-- Chevron Icon -->
+              <svg
+                class="w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-200 shrink-0 ml-1"
+                :class="{ 'rotate-180': isDropdownOpen }"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            <!-- Dropdown Popover Menu -->
+            <transition
+              enter-active-class="transition duration-150 ease-out"
+              enter-from-class="transform scale-95 opacity-0 -translate-y-1"
+              enter-to-class="transform scale-100 opacity-100 translate-y-0"
+              leave-active-class="transition duration-100 ease-in"
+              leave-from-class="transform scale-100 opacity-100 translate-y-0"
+              leave-to-class="transform scale-95 opacity-0 -translate-y-1"
+            >
+              <div
+                v-if="isDropdownOpen"
+                class="absolute left-0 top-full mt-2 w-full sm:w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl shadow-slate-900/15 dark:shadow-black/70 z-50 p-2 overflow-hidden flex flex-col gap-2"
+              >
+                <!-- Search bar -->
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </span>
+                  <input
+                    v-model="teacherSearchQuery"
+                    type="text"
+                    placeholder="Cari nomor atau nama guru..."
+                    class="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    @click.stop
+                  />
+                </div>
+
+                <!-- Teacher List -->
+                <div class="max-h-64 overflow-y-auto space-y-1 pr-1">
+                  <div
+                    v-if="filteredTeachers.length === 0"
+                    class="py-6 text-center text-xs text-slate-400"
+                  >
+                    Guru tidak ditemukan
+                  </div>
+                  <button
+                    v-for="t in filteredTeachers"
+                    :key="t.id"
+                    type="button"
+                    @click="selectTeacher(t.id)"
+                    class="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left transition group cursor-pointer"
+                    :class="t.id === selectedTeacherId ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200' : 'hover:bg-slate-100/80 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'"
+                  >
+                    <!-- Modern Badge (nomor 1, 2, 3 tanpa tanda kurung) -->
+                    <span
+                      class="w-7 h-7 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 transition-colors"
+                      :class="t.id === selectedTeacherId ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-700 group-hover:border-emerald-500/30 group-hover:bg-emerald-500/10 group-hover:text-emerald-600 dark:group-hover:text-emerald-400'"
+                    >
+                      {{ t.id }}
+                    </span>
+
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm font-semibold truncate leading-tight" :class="t.id === selectedTeacherId ? 'text-emerald-800 dark:text-emerald-200 font-bold' : 'text-slate-800 dark:text-slate-200'">
+                        {{ t.name }}
+                      </div>
+                      <div class="text-[10px] text-slate-400 mt-0.5">
+                        <span v-if="!t.subjects || t.subjects.length === 0" class="text-amber-600 dark:text-amber-400 font-medium">Non-Pengajar</span>
+                        <span v-else>{{ t.subjects.length }} Mata Pelajaran</span>
+                      </div>
+                    </div>
+
+                    <!-- Selected Indicator Checkmark -->
+                    <svg
+                      v-if="t.id === selectedTeacherId"
+                      class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </transition>
+          </div>
         </div>
 
         <!-- Stats & Actions -->
@@ -418,9 +555,14 @@ function printTeacherSchedule() {
           <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white mt-0.5 print:text-sm print:mt-0">
             {{ currentTeacher?.name }}
           </h2>
-          <p class="text-xs text-slate-500 mt-0.5 print:text-[9px]">
-            Kode Guru: <span class="font-bold font-mono text-emerald-600">[{{ currentTeacher?.id }}]</span> • {{ schoolSetting?.schoolName || 'SMKS ISLAM DONOMULYO' }}
-          </p>
+          <div class="flex items-center gap-2 mt-1 text-xs text-slate-500 print:text-[9px] flex-wrap">
+            <span>Kode Guru:</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-md font-mono font-black text-xs bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 print:border-none print:p-0 print:text-black">
+              {{ currentTeacher?.id }}
+            </span>
+            <span>•</span>
+            <span>{{ schoolSetting?.schoolName || 'SMKS ISLAM DONOMULYO' }}</span>
+          </div>
         </div>
 
         <div class="text-right">
@@ -479,7 +621,7 @@ function printTeacherSchedule() {
                 </div>
                 <div class="text-[10px] text-slate-700 dark:text-slate-200 mt-1 font-semibold flex items-center justify-between">
                   <span class="truncate max-w-[130px]" :title="s.item.customLabel || s.classroom?.name">
-                    {{ s.item.customLabel || currentTeacher?.subjects?.find(sub => sub.code.toLowerCase() === s.item.subjectCode?.toLowerCase())?.name || 'Pelajaran' }}
+                    {{ s.item.customLabel || currentTeacher?.subjects?.find((sub: any) => sub.code?.toLowerCase() === s.item.subjectCode?.toLowerCase())?.name || 'Pelajaran' }}
                   </span>
                   <span class="font-mono font-bold text-emerald-700 dark:text-emerald-300 shrink-0">
                     {{ s.item.teacherId }}{{ s.item.subjectCode || '' }}

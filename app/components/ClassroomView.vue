@@ -53,8 +53,8 @@ function hashSubject(name: string): number {
 }
 
 function getSubjectColor(subjectName: string | null) {
-  if (!subjectName) return SUBJECT_COLORS[0]
-  return SUBJECT_COLORS[hashSubject(subjectName)]
+  if (!subjectName) return SUBJECT_COLORS[0]!
+  return SUBJECT_COLORS[hashSubject(subjectName)]!
 }
 
 // Per-day slot data
