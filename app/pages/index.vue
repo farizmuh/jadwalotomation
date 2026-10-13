@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Fetch full schedule state
-const { data, refresh, pending } = await useFetch('/api/schedule/full')
+const { data, refresh, pending } = await useFetch<any>('/api/schedule/full')
 
 const currentTab = ref<'master' | 'daily' | 'teacher' | 'classroom' | 'settings'>('master')
 

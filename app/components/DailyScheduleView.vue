@@ -92,7 +92,7 @@ const subjectMap = computed(() => {
 const teacherColumns = computed(() => {
   const cols: any[][] = [[], [], [], []]
   props.teachers.forEach((t, i) => {
-    cols[i % 4].push(t)
+    cols[i % 4]!.push(t)
   })
   return cols
 })

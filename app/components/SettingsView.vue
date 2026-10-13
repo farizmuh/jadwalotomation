@@ -387,7 +387,7 @@ const parsedBulkFromText = computed(() => {
     let targetJp = 4
 
     // Check if first column is numeric ID
-    if (/^\d+$/.test(parts[0])) {
+    if (parts[0] && /^\d+$/.test(parts[0])) {
       id = parts[0]
       name = parts[1] || ''
       subjectStr = parts[2] || ''
@@ -580,13 +580,13 @@ const parsedBulkSubjects = computed(() => {
     if (parts.length >= 2) {
       const num = Number(parts[1])
       if (!isNaN(num) && num > 0) {
-        name = parts[0]
+        name = parts[0] || ''
         targetJp = num
       } else {
         name = parts.join(' - ')
       }
     } else {
-      name = parts[0]
+      name = parts[0] || ''
     }
 
     if (name) {

@@ -92,7 +92,7 @@ const teacherColumns = computed(() => {
   const cols: any[][] = [[], [], [], []]
   props.teachers.forEach((t, index) => {
     const colIndex = Math.min(Math.floor(index / colSize), 3)
-    cols[colIndex].push(t)
+    cols[colIndex]!.push(t)
   })
   return cols
 })
