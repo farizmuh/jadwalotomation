@@ -18,6 +18,8 @@
     "@iconify-json/simple-icons": "^1.2.96",
     "@nuxt/ui": "^4.11.1",
     "@prisma/client": "^6.19.3",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "exceljs": "^4.4.0",
     "mysql2": "^3.24.4",
     "nuxt": "^4.5.2",

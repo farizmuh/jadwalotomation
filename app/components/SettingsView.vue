@@ -12,12 +12,12 @@ const emit = defineEmits<{
   (e: 'refreshed'): void
 }>()
 
-const activeTab = useState<'school' | 'teachers' | 'classrooms' | 'timeslots' | 'piket' | 'ekskul'>('settings_active_tab', () => 'school')
+const activeTab = useState<'school' | 'teachers' | 'classrooms' | 'timeslots' | 'piket' | 'ekskul' | 'account'>('settings_active_tab', () => 'school')
 
 onMounted(() => {
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem('settings_active_tab')
-    if (saved && ['school', 'teachers', 'classrooms', 'timeslots', 'piket', 'ekskul'].includes(saved)) {
+    if (saved && ['school', 'teachers', 'classrooms', 'timeslots', 'piket', 'ekskul', 'account'].includes(saved)) {
       activeTab.value = saved as any
     }
   }
@@ -66,6 +66,51 @@ async function saveSchoolSettings() {
     showNotification('error', err.message || 'Terjadi kesalahan')
   } finally {
     isSaving.value = false
+  }
+}
+
+// Account / Password Change
+const isChangingPassword = ref(false)
+const formPassword = reactive({
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+async function changePassword() {
+  if (!formPassword.currentPassword || !formPassword.newPassword || !formPassword.confirmPassword) {
+    showNotification('error', 'Semua field password wajib diisi')
+    return
+  }
+  if (formPassword.newPassword !== formPassword.confirmPassword) {
+    showNotification('error', 'Konfirmasi password baru tidak cocok')
+    return
+  }
+  if (formPassword.newPassword.length < 6) {
+    showNotification('error', 'Password baru minimal 6 karakter')
+    return
+  }
+  isChangingPassword.value = true
+  try {
+    const res: any = await $fetch('/api/auth/change-password', {
+      method: 'POST',
+      body: {
+        currentPassword: formPassword.currentPassword,
+        newPassword: formPassword.newPassword
+      }
+    })
+    if (res.success) {
+      showNotification('success', 'Password berhasil diubah!')
+      formPassword.currentPassword = ''
+      formPassword.newPassword = ''
+      formPassword.confirmPassword = ''
+    } else {
+      showNotification('error', res.message || 'Gagal mengubah password')
+    }
+  } catch (err: any) {
+    showNotification('error', err.data?.statusMessage || err.message || 'Terjadi kesalahan')
+  } finally {
+    isChangingPassword.value = false
   }
 }
 
@@ -1024,7 +1069,8 @@ async function saveEditSlot() {
           { key: 'classrooms', label: 'Kelas & Jurusan', icon: '👥' },
           { key: 'timeslots', label: 'Hari, Jam & Istirahat', icon: '⏰' },
           { key: 'piket', label: 'Guru Piket Harian', icon: '📋' },
-          { key: 'ekskul', label: 'Ekstrakurikuler & Pembina', icon: '🏆' }
+          { key: 'ekskul', label: 'Ekstrakurikuler & Pembina', icon: '🏆' },
+          { key: 'account', label: 'Akun Admin', icon: '🔐' }
         ]"
         :key="tab.key"
         :class="[
@@ -2641,6 +2687,94 @@ async function saveEditSlot() {
               Simpan Perubahan
             </button>
           </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- TAB 7: AKUN ADMIN -->
+    <div v-if="activeTab === 'account'" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-700 to-slate-900 dark:from-slate-600 dark:to-slate-800 text-white flex items-center justify-center text-lg shadow-sm">
+          🔐
+        </div>
+        <div>
+          <h3 class="font-extrabold text-lg text-slate-900 dark:text-white">
+            Keamanan Akun Admin
+          </h3>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Ganti password login admin. Diperlukan verifikasi password lama sebelum membuat password baru.
+          </p>
+        </div>
+      </div>
+
+      <div class="max-w-md">
+        <form @submit.prevent="changePassword" class="space-y-4 p-5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl">
+          <!-- Current Password -->
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+              Password Lama
+            </label>
+            <input
+              v-model="formPassword.currentPassword"
+              type="password"
+              placeholder="Masukkan password lama..."
+              autocomplete="current-password"
+              class="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-slate-500 transition"
+            />
+          </div>
+
+          <!-- New Password -->
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+              Password Baru
+            </label>
+            <input
+              v-model="formPassword.newPassword"
+              type="password"
+              placeholder="Minimal 6 karakter..."
+              autocomplete="new-password"
+              class="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-slate-500 transition"
+            />
+          </div>
+
+          <!-- Confirm New Password -->
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+              Konfirmasi Password Baru
+            </label>
+            <input
+              v-model="formPassword.confirmPassword"
+              type="password"
+              placeholder="Ulangi password baru..."
+              autocomplete="new-password"
+              class="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-slate-500 transition"
+              :class="formPassword.confirmPassword && formPassword.newPassword !== formPassword.confirmPassword ? 'border-red-400 dark:border-red-600 focus:ring-red-400' : ''"
+            />
+            <p v-if="formPassword.confirmPassword && formPassword.newPassword !== formPassword.confirmPassword" class="text-[11px] text-red-500 font-semibold mt-1">
+              ⚠️ Konfirmasi password tidak cocok
+            </p>
+          </div>
+
+          <!-- Info box -->
+          <div class="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl text-xs text-amber-700 dark:text-amber-400 font-medium space-y-1">
+            <p class="font-bold">📋 Persyaratan Password:</p>
+            <ul class="list-disc list-inside space-y-0.5 text-[11px]">
+              <li>Minimal 6 karakter</li>
+              <li>Masukkan password lama untuk verifikasi</li>
+              <li>Password baru dan konfirmasi harus sama</li>
+            </ul>
+          </div>
+
+          <!-- Submit -->
+          <button
+            type="submit"
+            :disabled="isChangingPassword || !formPassword.currentPassword || !formPassword.newPassword || !formPassword.confirmPassword || formPassword.newPassword !== formPassword.confirmPassword"
+            class="w-full px-5 py-2.5 bg-gradient-to-r from-slate-700 to-slate-900 hover:from-slate-800 hover:to-black disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-sm rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+          >
+            <span v-if="isChangingPassword" class="animate-spin inline-block">⏳</span>
+            <span v-else>🔒</span>
+            <span>{{ isChangingPassword ? 'Mengubah Password...' : 'Ubah Password' }}</span>
+          </button>
         </form>
       </div>
     </div>

@@ -14,8 +14,8 @@ export default defineEventHandler((event) => {
   // Allow all non-API routes (pages, assets, etc.)
   if (!pathname.startsWith('/api/')) return
 
-  // Allow auth routes (login, logout, me)
-  if (pathname.startsWith('/api/auth/')) return
+  // Allow auth routes (login, logout, me) — EXCEPT change-password which requires auth
+  if (pathname.startsWith('/api/auth/') && pathname !== '/api/auth/change-password') return
 
   // Allow all GET requests (read-only, public)
   if (method === 'GET') return
